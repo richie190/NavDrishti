@@ -1,5 +1,6 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { Chrome as ChromeIcon } from 'lucide-react';
 import { useExperience } from './hooks/useExperience';
 import { Header, JourneyChrome, Loading } from './components/Chrome';
@@ -17,10 +18,18 @@ class RenderBoundary extends Component<{ children: ReactNode; onError: () => voi
 }
 
 export default function App() {
+  return <Routes>
+    <Route path="/" element={<LandingPage />} />
+    <Route path="/command-center" element={<CommandCenter />} />
+    <Route path="*" element={<Navigate to="/" replace />} />
+  </Routes>;
+}
+
+function LandingPage() {
+  const navigate = useNavigate();
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const [lite, setLite] = useState(() => innerWidth < 800 || navigator.hardwareConcurrency <= 4);
-  const [commandOpen, setCommandOpen] = useState(false);
   const [station, setStation] = useState('bharati');
   const [scenario, setScenarioState] = useState('single');
   const [running, setRunning] = useState(false);
@@ -38,10 +47,7 @@ export default function App() {
   }, [ready, failed, handleFailure]);
   useEffect(() => { motion.current.controls = controls; }, [controls, motion]);
   useEffect(() => { motion.current.scenario = scenario; motion.current.simulation = progress; }, [scenario, progress, motion]);
-  useEffect(() => {
-    if (commandOpen) { lenis.current?.stop(); setTour(false); }
-    else lenis.current?.start();
-  }, [commandOpen, lenis, setTour]);
+  useEffect(() => { lenis.current?.start(); }, [lenis]);
   useEffect(() => {
     if (!running) return;
     let start: number | undefined;
@@ -60,7 +66,7 @@ export default function App() {
   const setControl = <K extends keyof SceneControls>(key: K, value: SceneControls[K]) => setControls(previous => ({ ...previous, [key]: value }));
   const setScenario = (id: string) => { setRunning(false); setProgress(0); setScenarioState(id); };
   const run = () => { setProgress(0); setRunning(true); };
-  const command = () => setCommandOpen(true);
+  const command = () => navigate('/command-center');
   const selectStation = (id: string) => { setStation(id); go('stations'); };
 
   return <div className={`app ${reduced ? 'reduced-motion' : ''}`} data-active={active}>
@@ -74,6 +80,5 @@ export default function App() {
     <Story go={go} command={command} controls={controls} setControl={setControl} station={station} setStation={setStation} scenario={scenario} setScenario={setScenario} running={running} progress={progress} run={run} reduced={reduced} />
     <JourneyChrome active={active} go={go} lite={lite} setLite={setLite} tour={tour} />
     <Loading ready={ready} failed={failed} reduced={reduced} />
-    <CommandCenter open={commandOpen} onClose={() => setCommandOpen(false)} simulate={() => { setCommandOpen(false); go('simulation'); }} />
   </div>;
 }
