@@ -1,478 +1,707 @@
 import 'leaflet/dist/leaflet.css';
 import * as L from 'leaflet';
-import { AnimatePresence, motion } from 'framer-motion';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Circle, MapContainer, Marker, Polygon, Polyline, Tooltip, useMap } from 'react-leaflet';
+import { Circle, MapContainer, Marker, Polyline, Tooltip, useMap } from 'react-leaflet';
 import {
-  Activity,
-  CheckCircle2,
+  AlertTriangle,
+  Anchor,
   ChevronLeft,
+  Compass,
   Fuel,
   Gauge,
-  LockKeyhole,
+  Info,
   Play,
   Radar,
-  RotateCcw,
   Route as RouteIcon,
+  ShieldAlert,
   Ship,
   Snowflake,
   Timer,
-  X,
-  Zap,
 } from 'lucide-react';
-import {
-  alertEvent,
-  heatmapStates,
-  historicalRoute,
-  icebergs,
-  routes,
-  vessel,
-  voyage,
-  type CandidateRoute,
-  type Coordinate,
-  type RouteType,
-} from '../data/mockData';
 
-type SimulationMode = 'idle' | 'planning' | 'replay' | 'complete';
+type SimulationMode = 'idle' | 'replay' | 'complete';
+type Coordinate = [number, number];
 
-const REPLAY_DURATION_MS = 38000;
-const START_POINT = historicalRoute.points[0];
-const END_POINT = historicalRoute.points[historicalRoute.points.length - 1];
-const mapBounds = L.latLngBounds([[-72, 13], [-31, 82]]);
+const analysisStages = [
+  'Fetching satellite imagery',
+  'Retrieving live ice-chart data',
+  'Processing sea-ice conditions',
+  'Running route-optimisation algorithm',
+];
+
+export interface RouteOption {
+  type: 'historical' | 'safest' | 'fastest' | 'fuel';
+  label: string;
+  badge: string;
+  color: string;
+  etaDays: number;
+  fuelUsed: number;
+  distanceKm: number;
+  polarisRIO: number;
+  hazardsNear: number;
+  description: string;
+  points: Coordinate[];
+}
+
+export interface CaseStudy {
+  id: string;
+  buttonLabel: string;
+  subtitle: string;
+  shipName: string;
+  year: number;
+  statusTag: 'CRASHED & SUNK' | 'TRAPPED & DELAYED' | 'OPTIMAL SUCCESS';
+  shipSize: string;
+  fuelLimit: string;
+  iceResistance: string;
+  crewPassengers: string;
+  incidentDetails: string;
+  startPort: string;
+  destination: string;
+  startCoords: Coordinate;
+  endCoords: Coordinate;
+  routes: RouteOption[];
+}
+
 const numberFormatter = new Intl.NumberFormat('en-IN');
-const dateFormatter = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+
+// Real-World Antarctic Case Studies Dataset
+const caseStudies: CaseStudy[] = [
+  {
+    id: 'explorer-2007',
+    buttonLabel: '1. "MV Explorer, 2007"',
+    subtitle: 'Ship Which Crashed',
+    shipName: 'MV Explorer',
+    year: 2007,
+    statusTag: 'CRASHED & SUNK',
+    shipSize: '75 meters (246 ft) / 2,398 GT',
+    fuelLimit: '280 tonnes (Marine Gas Oil)',
+    iceResistance: '1A Ice Class (Ice-hardened double hull; non-icebreaker)',
+    crewPassengers: '100 Passengers, 54 Crew members',
+    incidentDetails:
+      'Struck submerged multi-year ice in the Bransfield Strait after misjudging ice thickness. Sustained a 10-inch hull puncture and sank within 16 hours. Required emergency lifeboat evacuation.',
+    startPort: 'Ushuaia / Drake Passage',
+    destination: 'King George Island',
+    startCoords: [-54.8, -68.3],
+    endCoords: [-62.2, -58.9],
+    routes: [
+      {
+        type: 'historical',
+        label: 'Historical Route (Crash Site)',
+        badge: 'CRASHED',
+        color: '#FF4155', 
+        etaDays: 5.5,
+        fuelUsed: 145,
+        distanceKm: 1280,
+        polarisRIO: -12,
+        hazardsNear: 14,
+        description: 'Direct passage through thick multi-year pack ice. Lead to hull breach and sinking.',
+        points: [[-54.8, -68.3], [-57.5, -65.1], [-60.2, -61.8], [-62.2, -58.9]],
+      },
+      {
+        type: 'safest',
+        label: 'Safest Route (AI Preferred)',
+        badge: 'RECOMMENDED',
+        color: '#10B981', 
+        etaDays: 4.8,
+        fuelUsed: 105,
+        distanceKm: 1390,
+        polarisRIO: 8,
+        hazardsNear: 1,
+        description: 'Wide western detachment around Bransfield Strait multi-year ice fields.',
+        points: [[-54.8, -68.3], [-56.8, -69.5], [-59.9, -64.2], [-62.2, -58.9]],
+      },
+      {
+        type: 'fastest',
+        label: 'Fastest Route',
+        badge: 'HIGH RISK',
+        color: '#F59E0B', 
+        etaDays: 4.1,
+        fuelUsed: 128,
+        distanceKm: 1210,
+        polarisRIO: -4,
+        hazardsNear: 8,
+        description: 'Skirts northern ice edge at maximum service speed; vulnerable to growlers.',
+        points: [[-54.8, -68.3], [-57.1, -64.0], [-60.8, -60.5], [-62.2, -58.9]],
+      },
+      {
+        type: 'fuel',
+        label: 'Fuel Efficient Route',
+        badge: 'ECO-PASSAGE',
+        color: '#06B6D4', 
+        etaDays: 5.0,
+        fuelUsed: 92,
+        distanceKm: 1295,
+        polarisRIO: 4,
+        hazardsNear: 3,
+        description: 'Leverages Antarctic Circumpolar drift currents to cut fuel consumption by 36%.',
+        points: [[-54.8, -68.3], [-57.8, -66.8], [-60.5, -62.0], [-62.2, -58.9]],
+      },
+    ],
+  },
+  {
+    id: 'magdalena-2002',
+    buttonLabel: '2. "MV Magdalena Oldendorff, 2002"',
+    subtitle: 'Ship Which Wasted Fuel',
+    shipName: 'MV Magdalena Oldendorff',
+    year: 2002,
+    statusTag: 'TRAPPED & DELAYED',
+    shipSize: '186 meters (610 ft) / 18,600 GT',
+    fuelLimit: '2,500 tonnes (Heavy Marine Diesel)',
+    iceResistance: 'Germanischer Lloyd E4 (Ice-strengthened cargo liner)',
+    crewPassengers: '79 Scientists, 28 Crew members',
+    incidentDetails:
+      'Beset and trapped by rapidly shifting pack ice in Muskegbukta Bay near Maitri station. Remained ice-locked for months, burning massive fuel reserves to power generators while waiting for icebreakers.',
+    startPort: 'Cape Town (CPT)',
+    destination: 'Maitri Station / Queen Maud Land',
+    startCoords: [-33.9, 18.4],
+    endCoords: [-70.7, 11.7],
+    routes: [
+      {
+        type: 'historical',
+        label: 'Historical Route (Trapped Site)',
+        badge: 'BESET IN ICE',
+        color: '#FF4155', 
+        etaDays: 19.2,
+        fuelUsed: 890,
+        distanceKm: 4620,
+        polarisRIO: -8,
+        hazardsNear: 18,
+        description: 'Trapped in closing ice leads in Muskegbukta Bay due to delayed ice chart data.',
+        points: [[-33.9, 18.4], [-44.2, 16.1], [-56.8, 14.2], [-65.1, 12.8], [-70.7, 11.7]],
+      },
+      {
+        type: 'safest',
+        label: 'Safest Route (AI Preferred)',
+        badge: 'RECOMMENDED',
+        color: '#10B981', 
+        etaDays: 14.1,
+        fuelUsed: 540,
+        distanceKm: 4450,
+        polarisRIO: 10,
+        hazardsNear: 2,
+        description: 'Navigates open leads identified by predictive SAR satellite trajectories.',
+        points: [[-33.9, 18.4], [-45.0, 22.1], [-57.1, 20.4], [-66.0, 16.2], [-70.7, 11.7]],
+      },
+      {
+        type: 'fastest',
+        label: 'Fastest Route',
+        badge: 'DIRECT SPRINT',
+        color: '#F59E0B', 
+        etaDays: 12.8,
+        fuelUsed: 670,
+        distanceKm: 4210,
+        polarisRIO: 2,
+        hazardsNear: 6,
+        description: 'Straight Great-Circle route through thin first-year pack ice corridor.',
+        points: [[-33.9, 18.4], [-43.8, 17.5], [-55.2, 15.0], [-64.8, 13.1], [-70.7, 11.7]],
+      },
+      {
+        type: 'fuel',
+        label: 'Fuel Efficient Route',
+        badge: 'OPTIMIZED',
+        color: '#06B6D4', 
+        etaDays: 13.9,
+        fuelUsed: 480,
+        distanceKm: 4320,
+        polarisRIO: 7,
+        hazardsNear: 3,
+        description: 'Minimizes ice-ramming manoeuvres, reducing fuel burn by 46% compared to actual trip.',
+        points: [[-33.9, 18.4], [-44.5, 19.8], [-56.5, 17.8], [-65.2, 14.5], [-70.7, 11.7]],
+      },
+    ],
+  },
+  {
+    id: 'vasiliy-2022',
+    buttonLabel: '3. "MV Vasiliy Golovnin, 2022"',
+    subtitle: 'Normal & Optimal Success',
+    shipName: 'MV Vasiliy Golovnin',
+    year: 2022,
+    statusTag: 'OPTIMAL SUCCESS',
+    shipSize: '160 meters (524 ft) / 14,200 GT',
+    fuelLimit: '3,200 tonnes (High Endurance Resupply Tanker)',
+    iceResistance: 'Russian Arc7 Ice Class (Heavy diesel-electric icebreaker)',
+    crewPassengers: '41st Indian Expedition Team & Crew',
+    incidentDetails:
+      'Successful resupply mission to India’s Maitri and Bharati research stations. Traversed dense pack ice without incident, hull fatigue, or schedule delays.',
+    startPort: 'Cape Town (CPT)',
+    destination: 'Bharati Station (Larsemann Hills)',
+    startCoords: [-33.9, 18.4],
+    endCoords: [-69.4, 76.2],
+    routes: [
+      {
+        type: 'historical',
+        label: 'Historical Route (Executed)',
+        badge: 'COMPLETED',
+        color: '#FF4155', 
+        etaDays: 12.2,
+        fuelUsed: 460,
+        distanceKm: 5120,
+        polarisRIO: 6,
+        hazardsNear: 5,
+        description: 'Original route executed using standard ice navigators and helicopter reconnaissance.',
+        points: [[-33.9, 18.4], [-46.1, 35.2], [-58.4, 52.1], [-65.2, 68.0], [-69.4, 76.2]],
+      },
+      {
+        type: 'safest',
+        label: 'Safest Route (AI Preferred)',
+        badge: 'RECOMMENDED',
+        color: '#10B981', 
+        etaDays: 11.0,
+        fuelUsed: 390,
+        distanceKm: 4980,
+        polarisRIO: 14,
+        hazardsNear: 1,
+        description: 'Bypasses iceberg cluster off Prydz Bay using AI drift forecasting.',
+        points: [[-33.9, 18.4], [-45.5, 38.0], [-57.0, 56.4], [-64.8, 71.0], [-69.4, 76.2]],
+      },
+      {
+        type: 'fastest',
+        label: 'Fastest Route',
+        badge: 'EXPRESS PASSAGE',
+        color: '#F59E0B', 
+        etaDays: 9.8,
+        fuelUsed: 430,
+        distanceKm: 4790,
+        polarisRIO: 9,
+        hazardsNear: 4,
+        description: 'Direct high-latitude transit leveraging Arc7 hull ice-breaking capability.',
+        points: [[-33.9, 18.4], [-47.0, 36.5], [-59.1, 54.0], [-66.1, 70.2], [-69.4, 76.2]],
+      },
+      {
+        type: 'fuel',
+        label: 'Fuel Efficient Route',
+        badge: 'ECO-PASSAGE',
+        color: '#06B6D4', 
+        etaDays: 10.5,
+        fuelUsed: 350,
+        distanceKm: 4890,
+        polarisRIO: 12,
+        hazardsNear: 2,
+        description: 'Optimized throttle profiling saving 110 tonnes of station resupply fuel.',
+        points: [[-33.9, 18.4], [-45.8, 37.1], [-57.8, 55.2], [-65.0, 70.5], [-69.4, 76.2]],
+      },
+    ],
+  },
+];
+
+// Helper to dynamically calculate precise map bounds based on selected case study
+function getCaseBounds(caseStudy: CaseStudy): L.LatLngBounds {
+  const allPoints = caseStudy.routes.flatMap(r => r.points);
+  const lats = allPoints.map(p => p[0]);
+  const lngs = allPoints.map(p => p[1]);
+  return L.latLngBounds(
+    [Math.min(...lats) - 2, Math.min(...lngs) - 4],
+    [Math.max(...lats) + 2, Math.max(...lngs) + 4]
+  );
+}
 
 export default function CommandCenter() {
   const navigate = useNavigate();
+  const [activeCaseIndex, setActiveCaseIndex] = useState<number | null>(null);
+  const [selectedRouteType, setSelectedRouteType] = useState<string>('safest');
   const [mode, setMode] = useState<SimulationMode>('idle');
-  const [selectedType, setSelectedType] = useState<RouteType | null>(null);
-  const [heatmapOn, setHeatmapOn] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [speed, setSpeed] = useState(1);
-  const [alertTriggered, setAlertTriggered] = useState(false);
-  const [alertVisible, setAlertVisible] = useState(false);
+  const [heatmapOn, setHeatmapOn] = useState(false);
+  const [isAnalysing, setIsAnalysing] = useState(false);
   const frame = useRef(0);
+  const analysisTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const started = mode !== 'idle';
-  const locked = mode === 'replay' || mode === 'complete';
-  const selectedRoute = useMemo(() => routes.find(route => route.type === selectedType) ?? null, [selectedType]);
-  const heatmapIndex = heatmapOn ? Math.min(heatmapStates.length - 1, Math.floor(progress * heatmapStates.length)) : 0;
-  const currentDate = selectedRoute ? formatDateAtProgress(voyage.startDate, selectedRoute.etaDays, progress) : formatDateAtProgress(voyage.startDate, 0, 0);
-  const comparison = selectedRoute ? buildComparison(selectedRoute) : null;
+  const activeCase = activeCaseIndex === null ? null : caseStudies[activeCaseIndex];
+  const selectedRoute = useMemo(
+    () => activeCase?.routes.find(r => r.type === selectedRouteType) ?? activeCase?.routes[1] ?? null,
+    [activeCase, selectedRouteType]
+  );
+  const dynamicBounds = useMemo(() => activeCase ? getCaseBounds(activeCase) : null, [activeCase]);
 
-  const startSimulation = () => {
-    setMode('planning');
-    setSelectedType(null);
+  const handleSelectCase = (index: number) => {
+    setActiveCaseIndex(index);
+    setSelectedRouteType('safest');
+    setMode('idle');
     setProgress(0);
-    setSpeed(1);
-    setAlertTriggered(false);
-    setAlertVisible(false);
+    setIsAnalysing(false);
+    if (analysisTimer.current) clearTimeout(analysisTimer.current);
   };
 
-  const selectRoute = useCallback((type: RouteType) => {
-    if (locked) return;
-    setSelectedType(type);
-  }, [locked]);
-
-  const approveRoute = () => {
-    if (!selectedRoute) return;
-    setMode('replay');
+  const startReplay = () => {
+    if (!activeCase) return;
+    setIsAnalysing(true);
+    setMode('idle');
     setProgress(0);
-    setAlertTriggered(false);
-    setAlertVisible(false);
+    analysisTimer.current = setTimeout(() => {
+      setIsAnalysing(false);
+      setMode('replay');
+    }, 5000);
   };
 
-  const restartToLanding = () => navigate('/');
+  useEffect(() => () => {
+    if (analysisTimer.current) clearTimeout(analysisTimer.current);
+  }, []);
 
   useEffect(() => {
-    if (mode !== 'replay' || !selectedRoute) return undefined;
+    if (mode !== 'replay') return undefined;
     let lastTime: number | undefined;
 
     const tick = (time: number) => {
       lastTime ??= time;
       const delta = time - lastTime;
       lastTime = time;
-      setProgress(previous => Math.min(1, previous + (delta * speed) / REPLAY_DURATION_MS));
+      setProgress(prev => {
+        const next = prev + (delta * 1.5) / 30000; // Hardcoded optimal simulation speed
+        if (next >= 1) {
+          setMode('complete');
+          return 1;
+        }
+        return next;
+      });
       frame.current = requestAnimationFrame(tick);
     };
 
     frame.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame.current);
-  }, [mode, selectedRoute, speed]);
+  }, [mode]);
 
-  useEffect(() => {
-    if (mode === 'replay' && progress >= 1) setMode('complete');
-  }, [mode, progress]);
-
-  useEffect(() => {
-    const triggerAt = alertEvent.triggerProgressPct / 100;
-    if (mode === 'replay' && progress >= triggerAt && !alertTriggered) {
-      setAlertTriggered(true);
-      setAlertVisible(true);
-    }
-  }, [alertTriggered, mode, progress]);
-
-  return <main className="command-page">
-    <header className="command-topbar">
-      <button className="command-back" onClick={() => navigate('/')} aria-label="Back to landing page"><ChevronLeft size={17} />NAVDHRISHTI</button>
-      <div className="command-title-block">
-        <p className="eyebrow"><Radar size={13} /> POLARIS DECISION SUPPORT</p>
-        <h1>Antarctic Ship-Routing Command Center</h1>
-      </div>
-      <div className="command-clock"><span>SIM TIME</span><strong>{currentDate}</strong></div>
-    </header>
-
-    <section className="command-layout" aria-label="Antarctic route decision dashboard">
-      <LeftPanel started={started} />
-      <section className="command-map-panel">
-        <div className="command-map-toolbar">
-          <div>
-            <span className={`command-live-dot ${mode === 'replay' ? 'is-live' : ''}`} />
-            <strong>{mode === 'idle' ? 'MAP STANDBY' : mode === 'planning' ? 'ROUTE REVEAL' : mode === 'replay' ? 'REPLAY ACTIVE' : 'ARRIVED'}</strong>
-          </div>
-          <button className={`heatmap-toggle ${heatmapOn ? 'is-on' : ''}`} onClick={() => setHeatmapOn(value => !value)} aria-pressed={heatmapOn}>
-            <Snowflake size={15} />Ice Heatmap
-          </button>
+  return (
+    <main className="command-page">
+      <header className="command-topbar">
+        <button className="command-back" onClick={() => navigate('/')} aria-label="Back to landing page">
+          <ChevronLeft size={17} /> NAVDRISHTI
+        </button>
+        <div className="command-title-block">
+          <p className="eyebrow">
+            <Radar size={13} /> POLAR INTELLIGENCE COMMAND CENTER
+          </p>
+          <h1>Antarctic Ship-Routing Case Studies</h1>
         </div>
-        <RouteMap
-          started={started}
-          locked={locked}
-          mode={mode}
-          progress={progress}
-          selectedType={selectedType}
-          heatmapOn={heatmapOn}
-          heatmapIndex={heatmapIndex}
-          onSelect={selectRoute}
-        />
-        <AnimatePresence>
-          {mode === 'idle' && <motion.div className="start-simulation-overlay" initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .45 }}>
-            <button className="start-simulation-button" onClick={startSimulation}><Play size={18} fill="currentColor" />Start Simulation</button>
-          </motion.div>}
-        </AnimatePresence>
-        {(mode === 'replay' || mode === 'complete') && selectedRoute && <ReplayControls
-          progress={progress}
-          speed={speed}
-          route={selectedRoute}
-          currentDate={currentDate}
-          onSpeed={setSpeed}
-          onScrub={value => setProgress(value)}
-        />}
+        <div className="command-clock">
+          <span>SELECTED CASE</span>
+          <strong>{activeCase?.shipName ?? 'Choose a case study'}</strong>
+        </div>
+      </header>
+
+      <section className="command-layout" aria-label="Antarctic route decision dashboard">
+        {/* Compact, anti-scroll Left Panel */}
+        <aside className="command-side-panel left" style={{ paddingBottom: '12px', display: 'flex', flexDirection: 'column' }}>
+          <div className="panel-heading" style={{ marginBottom: '12px' }}>
+            <Ship size={17} />
+            <span>HISTORICAL CASE STUDIES</span>
+          </div>
+
+          <div className="case-study-boxes-container" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+            {caseStudies.map((caseItem, idx) => (
+              <button
+                key={caseItem.id}
+                className={`case-rectangular-box ${activeCaseIndex === idx ? 'is-active' : ''}`}
+                onClick={() => handleSelectCase(idx)}
+                style={{
+                  textAlign: 'left',
+                  padding: '10px 14px',
+                  borderRadius: '6px',
+                  border: activeCaseIndex === idx ? '2px solid #4dd2ff' : '1px solid rgba(255, 255, 255, 0.1)',
+                  backgroundColor: activeCaseIndex === idx ? 'rgba(77, 210, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <div style={{ fontSize: '13px', fontWeight: 600, color: activeCaseIndex === idx ? '#fff' : '#a0b3c6', marginBottom: '2px' }}>
+                  {caseItem.buttonLabel}
+                </div>
+                <div style={{ fontSize: '11px', color: '#68829e', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {caseItem.subtitle}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {activeCase ? <motion.div
+            key={activeCase.id}
+            className="dossier-card"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}
+          >
+            <div className="dossier-header" style={{ marginBottom: '4px' }}>
+              <span className={`status-badge ${activeCase.statusTag.replace(/\s+/g, '-').toLowerCase()}`}>
+                {activeCase.statusTag}
+              </span>
+              <h2 style={{ fontSize: '1.25rem', margin: '4px 0' }}>{activeCase.shipName}</h2>
+              <small className="mono">YEAR {activeCase.year}</small>
+            </div>
+
+            <div className="dossier-grid" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <InfoRow label="Ship Size" value={activeCase.shipSize} icon={<Ship size={13} />} />
+              <InfoRow label="Fuel Capacity" value={activeCase.fuelLimit} icon={<Fuel size={13} />} />
+              <InfoRow label="Ice Resistance" value={activeCase.iceResistance} icon={<ShieldAlert size={13} />} />
+              <InfoRow label="Personnel" value={activeCase.crewPassengers} icon={<Anchor size={13} />} />
+              <InfoRow label="Passage" value={`${activeCase.startPort} → ${activeCase.destination}`} icon={<Compass size={13} />} />
+            </div>
+
+            <div className="incident-summary" style={{ marginTop: 'auto', padding: '12px', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
+              <p className="eyebrow" style={{ marginBottom: '6px', fontSize: '10px' }}><Info size={12} /> INCIDENT BRIEF</p>
+              <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.4', color: '#cbd5e1' }}>{activeCase.incidentDetails}</p>
+            </div>
+          </motion.div> : <SelectionNote
+            icon={<Compass size={22} />}
+            title="Select a case study"
+            description="Choose one of the three historical voyages above to view the vessel, route options, and operational briefing."
+          />}
+        </aside>
+
+        <section className="command-map-panel">
+          {activeCase && selectedRoute && dynamicBounds ? <>
+          <div className="command-map-toolbar">
+            <div className="legend-pills">
+              {activeCase.routes.map(r => (
+                <button
+                  key={r.type}
+                  className={`route-pill ${selectedRouteType === r.type ? 'is-active' : ''}`}
+                  onClick={() => setSelectedRouteType(r.type)}
+                  style={{ '--pill-color': r.color } as CSSProperties}
+                >
+                  <span className="dot" />
+                  <strong>{r.label}</strong>
+                </button>
+              ))}
+            </div>
+
+            <button
+              className={`heatmap-toggle ${heatmapOn ? 'is-on' : ''}`}
+              onClick={() => setHeatmapOn(v => !v)}
+              aria-pressed={heatmapOn}
+            >
+              <Snowflake size={15} /> Ice Heatmap
+            </button>
+          </div>
+
+          <MapShell
+            activeCase={activeCase}
+            selectedRouteType={selectedRouteType}
+            progress={progress}
+            mode={mode}
+            heatmapOn={heatmapOn}
+            dynamicBounds={dynamicBounds}
+            onSelectRoute={type => setSelectedRouteType(type)}
+          />
+
+          <div className="map-overlay-bottom">
+            {isAnalysing ? <AnalysisPopup /> : mode === 'idle' ? (
+              <button className="start-simulation-button" onClick={startReplay}>
+                <Play size={16} fill="currentColor" /> Simulate Passage ({selectedRoute.label})
+              </button>
+            ) : (
+              <div className="replay-controls" style={{ paddingRight: '24px' }}>
+                <div className="replay-meta">
+                  <span>REPLAYING: {selectedRoute.label}</span>
+                  <strong>{Math.round(progress * 100)}% COMPLETE</strong>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round(progress * 100)}
+                  onChange={e => setProgress(Number(e.target.value) / 100)}
+                  style={{ width: '100%' }}
+                />
+              </div>
+            )}
+          </div>
+          </> : <div className="case-selection-map">
+            <Radar size={38} />
+            <span>COMMAND CENTRE READY</span>
+            <strong>Select a historical case study to initialise the map.</strong>
+            <p>The map and route analysis remain focused on your selected voyage.</p>
+          </div>}
+        </section>
+
+        <aside className="command-side-panel right">
+          <div className="panel-heading">
+            <Gauge size={17} />
+            <span>ROUTE COMPARISON</span>
+          </div>
+
+          {selectedRoute ? <motion.div
+            key={selectedRoute.type}
+            className="route-detail-card"
+            initial={{ opacity: 0, x: 12 }}
+            animate={{ opacity: 1, x: 0 }}
+          >
+            <div className="route-detail-heading">
+              <span style={{ color: selectedRoute.color }}>{selectedRoute.label}</span>
+              <small className="mono">{selectedRoute.badge}</small>
+            </div>
+
+            <div className="rio-readout">
+              <span>POLARIS RIO SCORE</span>
+              <strong style={{ color: selectedRoute.polarisRIO < 0 ? '#FF4155' : '#10B981' }}>
+                {selectedRoute.polarisRIO > 0 ? `+${selectedRoute.polarisRIO}` : selectedRoute.polarisRIO}
+              </strong>
+              <p>{selectedRoute.polarisRIO < 0 ? 'High Risk Corridor (Danger)' : 'Safe Passage Permitted'}</p>
+            </div>
+
+            <div className="route-stat-grid">
+              <Metric icon={<Timer size={14} />} label="ETA" value={`${selectedRoute.etaDays} days`} />
+              <Metric icon={<Fuel size={14} />} label="Fuel Usage" value={`${numberFormatter.format(selectedRoute.fuelUsed)} t`} />
+              <Metric icon={<RouteIcon size={14} />} label="Distance" value={`${numberFormatter.format(selectedRoute.distanceKm)} km`} />
+              <Metric icon={<AlertTriangle size={14} />} label="Hazards Near" value={String(selectedRoute.hazardsNear)} />
+            </div>
+
+            <div className="route-description-box">
+              <p className="eyebrow">PASSAGE SUMMARY</p>
+              <p>{selectedRoute.description}</p>
+            </div>
+          </motion.div> : <SelectionNote
+            icon={<RouteIcon size={22} />}
+            title="Route comparison awaits"
+            description="Select a case study to compare safety, speed, fuel use, and nearby hazards."
+          />}
+        </aside>
       </section>
-      <RightPanel route={selectedRoute} started={started} locked={locked} onApprove={approveRoute} />
-    </section>
-
-    <AnimatePresence>
-      {alertVisible && <motion.aside className="route-alert-toast" initial={{ opacity: 0, y: 20, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: .98 }} role="status">
-        <div><Activity size={16} /><strong>AIS LIVE POSITION CHECK</strong></div>
-        <p>{alertEvent.message}</p>
-        <button onClick={() => setAlertVisible(false)}>Acknowledge<X size={13} /></button>
-      </motion.aside>}
-    </AnimatePresence>
-
-    <AnimatePresence>
-      {mode === 'complete' && selectedRoute && comparison && <SummaryModal route={selectedRoute} comparison={comparison} onRestart={restartToLanding} />}
-    </AnimatePresence>
-  </main>;
+    </main>
+  );
 }
 
-function LeftPanel({ started }: { started: boolean }) {
-  const rows = [
-    ['Vessel', vessel.name],
-    ['Ice class', vessel.iceClass],
-    ['Draft', vessel.draft],
-    ['Service speed', vessel.speed],
-    ['Fuel capacity', vessel.fuelCapacity],
-    ['Voyage start', voyage.startDate],
-    ['ETA window', voyage.endDate],
-    ['Route', `${voyage.origin} -> ${voyage.destination}`],
-  ];
-
-  return <aside className="command-side-panel left" aria-label="Vessel details">
-    <div className="panel-heading"><Ship size={17} /><span>VESSEL PACKAGE</span></div>
-    <div className="vessel-identity">
-      <span>{started ? 'EXPEDITION 001' : '-------'}</span>
-      <strong>{started ? vessel.name : '---'}</strong>
-    </div>
-    <div className="panel-rows">
-      {rows.map(([label, value]) => <InfoRow key={label} label={label} value={started ? value : '---'} />)}
-    </div>
-    <div className="data-tag"><span className="status-dot" />DATA AS OF {started ? voyage.dataAsOf : '---'}</div>
-  </aside>;
+function SelectionNote({ icon, title, description }: { icon: ReactNode; title: string; description: string }) {
+  return <div className="case-selection-note">
+    {icon}
+    <strong>{title}</strong>
+    <p>{description}</p>
+  </div>;
 }
 
-function RightPanel({ route, started, locked, onApprove }: { route: CandidateRoute | null; started: boolean; locked: boolean; onApprove: () => void }) {
-  return <aside className="command-side-panel right" aria-label="Route details">
-    <div className="panel-heading"><Gauge size={17} /><span>ROUTE INTELLIGENCE</span></div>
-    {!route && <div className="route-placeholder">
-      <span>{started ? 'SELECT ROUTE' : 'STANDBY'}</span>
-      <strong>---</strong>
-      <p>POLARIS RIO ---</p>
-      <div className="placeholder-grid">{Array.from({ length: 6 }, (_, index) => <i key={index} />)}</div>
-    </div>}
-    {route && <motion.div className="route-detail-card" key={route.type} initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: .25 }}>
-      <div className="route-detail-heading">
-        <span style={{ color: route.color }}>{route.label}</span>
-        {locked ? <small><LockKeyhole size={12} />SIGNED OFF</small> : <small>AWAITING APPROVAL</small>}
-      </div>
-      <div className="rio-readout">
-        <span>POLARIS RIO</span>
-        <strong>{route.polarisRIO}</strong>
-        <p>{route.polarisRIO <= -3 ? 'High caution corridor' : 'Requires officer judgement'}</p>
-      </div>
-      <div className="route-stat-grid">
-        <Metric icon={<Timer size={14} />} label="ETA" value={`${route.etaDays} days`} />
-        <Metric icon={<Fuel size={14} />} label="Fuel use" value={`${numberFormatter.format(route.fuelUsed)} t`} />
-        <Metric icon={<RouteIcon size={14} />} label="Distance" value={`${numberFormatter.format(route.distanceKm)} km`} />
-        <Metric icon={<Zap size={14} />} label="Confidence" value={`${route.confidencePct}%`} />
-      </div>
-      <div className="confidence-block">
-        <div><span>CONFIDENCE CONE</span><strong>{route.confidencePct}%</strong></div>
-        <div className="confidence-cone"><i style={{ width: `${route.confidencePct}%` }} /></div>
-      </div>
-      {!locked && <button className="approve-route-button" onClick={onApprove}>
-        <CheckCircle2 size={16} />Approve Route - POLARIS RIO: {route.polarisRIO} <span>requires officer judgement</span>
-      </button>}
-      {locked && <div className="locked-note"><LockKeyhole size={14} />Route selection locked for replay.</div>}
-    </motion.div>}
-  </aside>;
+function AnalysisPopup() {
+  return <div className="analysis-popup" role="status" aria-live="polite">
+    <div className="analysis-popup-heading"><Radar size={16} /><span>ROUTE ANALYSIS IN PROGRESS</span></div>
+    {analysisStages.map((stage, index) => <div className="analysis-stage" style={{ '--stage-delay': `${index * 1.15}s` } as CSSProperties} key={stage}>
+      <span className="analysis-spinner" />
+      <span>{stage}</span>
+    </div>)}
+  </div>;
 }
 
-function RouteMap({ started, locked, mode, progress, selectedType, heatmapOn, heatmapIndex, onSelect }: {
-  started: boolean;
-  locked: boolean;
+function MapShell({
+  activeCase,
+  selectedRouteType,
+  progress,
+  mode,
+  heatmapOn,
+  dynamicBounds,
+  onSelectRoute,
+}: {
+  activeCase: CaseStudy;
+  selectedRouteType: string;
+  progress: number;
   mode: SimulationMode;
-  progress: number;
-  selectedType: RouteType | null;
   heatmapOn: boolean;
-  heatmapIndex: number;
-  onSelect: (type: RouteType) => void;
+  dynamicBounds: L.LatLngBounds;
+  onSelectRoute: (type: string) => void;
 }) {
-  const activeRoute = routes.find(route => route.type === selectedType) ?? routes[0];
-  const replaying = mode === 'replay' || mode === 'complete';
-  const shipPosition = replaying && selectedType ? pointAtProgress(activeRoute.points, progress) : START_POINT;
-  const ghostPosition = replaying && selectedType ? pointAtProgress(historicalRoute.points, progress) : null;
+  const selectedRoute = activeCase.routes.find(r => r.type === selectedRouteType) ?? activeCase.routes[1];
+  const shipPos = mode === 'replay' ? pointAtProgress(selectedRoute.points, progress) : activeCase.routes[0].points[0];
 
-  return <div className="command-map-shell">
-    <MapContainer className="command-leaflet" center={[-53, 48]} zoom={3.25} zoomSnap={.25} minZoom={2.5} maxZoom={6} maxBounds={mapBounds} scrollWheelZoom={false} attributionControl={false} zoomControl={false}>
-      <MapViewport started={started} />
-      <PolarBasemap />
-      {started && heatmapOn && <HeatmapLayer index={heatmapIndex} />}
-      {started && <Polyline positions={historicalRoute.points} pathOptions={{ color: '#ff4155', weight: 4, opacity: .88, dashArray: '10 8', className: 'historical-route' }} />}
-      {started && <Marker position={midpoint(historicalRoute.points)} icon={labelIcon(`Historical Voyage - ${historicalRoute.date}`, 'historical-label')} interactive={false} />}
-      {started && routes.map(route => {
-        const selected = selectedType === route.type;
-        const dimmed = selectedType !== null && !selected;
-        const className = `candidate-route candidate-${route.type} ${selected ? 'is-selected' : ''} ${dimmed ? 'is-dimmed' : ''} ${locked ? 'is-locked' : ''}`;
-        return <Polyline
-          key={route.type}
-          positions={route.points}
-          pathOptions={{ color: route.color, weight: selected ? 7 : 3, opacity: dimmed ? .25 : .92, dashArray: selected ? undefined : '12 10', lineCap: 'round', lineJoin: 'round', className }}
-          eventHandlers={{ click: () => onSelect(route.type) }}
-        />;
-      })}
-      {started && !locked && routes.map(route => <Polyline
-        key={`${route.type}-hit`}
-        positions={route.points}
-        pathOptions={{ color: route.color, weight: 22, opacity: 0, lineCap: 'round' }}
-        eventHandlers={{ click: () => onSelect(route.type) }}
-      />)}
-      {started && routes.map(route => <Marker key={`${route.type}-label`} position={routeLabelPoint(route.points)} icon={labelIcon(route.label, `candidate-label ${route.type}`)} interactive={false} />)}
-      {started && icebergs.map(iceberg => <Marker key={`${iceberg.lat}-${iceberg.lng}`} position={[iceberg.lat, iceberg.lng]} icon={icebergIcon(iceberg.sizeCategory)} interactive={false}>
-        <Tooltip direction="top" offset={[0, -12]} opacity={.92}>Iceberg cluster {iceberg.sizeCategory}</Tooltip>
-      </Marker>)}
-      {started && <Marker position={START_POINT} icon={portIcon('CPT')} interactive={false} />}
-      {started && <Marker position={END_POINT} icon={stationIcon()} interactive={false} />}
-      {started && <Marker position={shipPosition} icon={shipIcon(replaying ? 'live' : 'parked')} zIndexOffset={900} interactive={false} />}
-      {ghostPosition && <Marker position={ghostPosition} icon={ghostShipIcon()} zIndexOffset={700} interactive={false} />}
-    </MapContainer>
-  </div>;
-}
+  return (
+    <div className="command-map-shell">
+      <MapContainer
+        className="command-leaflet"
+        center={activeCase.routes[0].points[0]}
+        zoom={3}
+        minZoom={2}
+        maxZoom={7}
+        scrollWheelZoom={false}
+        attributionControl={false}
+        zoomControl={false}
+      >
+        <MapViewport bounds={dynamicBounds} />
 
-function ReplayControls({ progress, speed, route, currentDate, onSpeed, onScrub }: {
-  progress: number;
-  speed: number;
-  route: CandidateRoute;
-  currentDate: string;
-  onSpeed: (speed: number) => void;
-  onScrub: (progress: number) => void;
-}) {
-  return <div className="replay-controls">
-    <div className="replay-meta">
-      <span>{currentDate}</span>
-      <strong>{route.label} replay</strong>
-      <span>{Math.round(progress * 100)}%</span>
+        {heatmapOn && activeCase.routes.flatMap(route => route.points.slice(1, -1)).map((position, index) => (
+          <Circle
+            key={`${position.join('-')}-${index}`}
+            center={position}
+            radius={90000}
+            pathOptions={{
+              className: 'heatmap-cell',
+              color: '#4dd2ff',
+              fillColor: '#4dd2ff',
+              fillOpacity: 0.16,
+              opacity: 0,
+              weight: 0,
+            }}
+          />
+        ))}
+
+        {activeCase.routes.map(r => {
+          const isSelected = r.type === selectedRouteType;
+          return (
+            <Polyline
+              key={r.type}
+              positions={r.points}
+              pathOptions={{
+                color: r.color,
+                weight: isSelected ? 6 : 3,
+                opacity: isSelected ? 1 : 0.45,
+                dashArray: r.type === 'historical' ? '8 6' : undefined,
+                lineCap: 'round',
+              }}
+              eventHandlers={{ click: () => onSelectRoute(r.type) }}
+            >
+              <Tooltip sticky>
+                <strong>{r.label}</strong> — RIO: {r.polarisRIO} | Fuel: {r.fuelUsed}t
+              </Tooltip>
+            </Polyline>
+          );
+        })}
+
+        <Marker position={activeCase.routes[0].points[0]} icon={portIcon('START')} />
+        <Marker position={activeCase.routes[0].points[activeCase.routes[0].points.length - 1]} icon={portIcon('DEST')} />
+        <Marker position={shipPos} icon={shipIcon()} zIndexOffset={1000} />
+      </MapContainer>
     </div>
-    <input type="range" min="0" max="100" value={Math.round(progress * 100)} onChange={event => onScrub(Number(event.target.value) / 100)} aria-label="Replay time position" />
-    <div className="speed-control" aria-label="Replay speed">
-      {[1, 2, 4].map(value => <button key={value} className={speed === value ? 'is-active' : ''} onClick={() => onSpeed(value)}>{value}x</button>)}
-    </div>
-  </div>;
+  );
 }
 
-function SummaryModal({ route, comparison, onRestart }: { route: CandidateRoute; comparison: ReturnType<typeof buildComparison>; onRestart: () => void }) {
-  return <motion.div className="summary-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-    <motion.section className="summary-modal" initial={{ y: 28, scale: .98 }} animate={{ y: 0, scale: 1 }} exit={{ y: 22, scale: .98 }} role="dialog" aria-modal="true" aria-labelledby="summary-title">
-      <div className="summary-heading">
-        <div><p className="eyebrow"><CheckCircle2 size={13} /> ARRIVAL CONFIRMED</p><h2 id="summary-title">Route outcome summary</h2></div>
-        <button onClick={onRestart} aria-label="Restart simulation"><RotateCcw size={18} /></button>
-      </div>
-      <p className="summary-callout">Recommended route: {comparison.shorterPct}% shorter, {comparison.fuelPct}% less fuel, {comparison.fewerHazards} fewer hazard encounters.</p>
-      <div className="summary-columns">
-        <SummaryColumn title={`${route.label} Route`} rows={[
-          ['Total distance', `${numberFormatter.format(route.distanceKm)} km`],
-          ['Fuel used', `${numberFormatter.format(route.fuelUsed)} t`],
-          ['Time taken', `${route.etaDays} days`],
-          ['Flagged hazards', String(route.hazardsNear)],
-        ]} accent={route.color} />
-        <SummaryColumn title="Historical Route" rows={[
-          ['Total distance', `${numberFormatter.format(historicalRoute.distanceKm)} km`],
-          ['Fuel used', `${numberFormatter.format(historicalRoute.fuelUsed)} t`],
-          ['Time taken', `${historicalRoute.durationDays} days`],
-          ['Flagged hazards', String(historicalRoute.hazardsNear)],
-        ]} accent="#ff4155" />
-      </div>
-      <button className="restart-button" onClick={onRestart}><RotateCcw size={16} />Restart Simulation</button>
-    </motion.section>
-  </motion.div>;
-}
-
-function SummaryColumn({ title, rows, accent }: { title: string; rows: [string, string][]; accent: string }) {
-  return <div className="summary-column" style={{ '--summary-accent': accent } as CSSProperties}>
-    <h3>{title}</h3>
-    {rows.map(([label, value]) => <InfoRow key={label} label={label} value={value} />)}
-  </div>;
-}
-
-function PolarBasemap() {
-  const meridians = [20, 35, 50, 65, 80];
-  const parallels = [-38, -46, -54, -62, -70];
-
-  return <>
-    {meridians.map(lng => <Polyline key={`lng-${lng}`} positions={[[-72, lng], [-32, lng]]} pathOptions={{ color: '#4dd2ff', opacity: .08, weight: 1, dashArray: '4 10' }} interactive={false} />)}
-    {parallels.map(lat => <Polyline key={`lat-${lat}`} positions={[[lat, 14], [lat, 82]]} pathOptions={{ color: '#4dd2ff', opacity: .08, weight: 1, dashArray: '4 10' }} interactive={false} />)}
-    <Polygon positions={[[-70.7, 48], [-70.1, 54], [-70.5, 61], [-69.8, 68], [-70.2, 76], [-72, 82], [-72, 28], [-71.2, 36]]} pathOptions={{ fillColor: '#d8f7ff', fillOpacity: .12, color: '#bdf5ff', opacity: .28, weight: 1 }} interactive={false} />
-    <Polygon positions={[[-63.8, 16], [-64.4, 22], [-63.6, 28], [-64.8, 35], [-66.7, 39], [-66.5, 30], [-68.4, 22], [-67.2, 16]]} pathOptions={{ fillColor: '#88e7ff', fillOpacity: .08, color: '#9deeff', opacity: .18, weight: 1 }} interactive={false} />
-  </>;
-}
-
-function HeatmapLayer({ index }: { index: number }) {
-  return <>
-    {heatmapStates[index].features.map((feature, featureIndex) => {
-      const [lng, lat] = feature.geometry.coordinates;
-      const intensity = feature.properties.intensity;
-      return <Circle
-        key={`${heatmapStates[index].id}-${featureIndex}`}
-        center={[lat, lng]}
-        radius={feature.properties.radiusKm * 1000}
-        pathOptions={{
-          color: 'transparent',
-          fillColor: intensity > .7 ? '#ffd23f' : '#4dd2ff',
-          fillOpacity: .08 + intensity * .18,
-          className: 'heatmap-cell',
-        }}
-        interactive={false}
-      />;
-    })}
-  </>;
-}
-
-function MapViewport({ started }: { started: boolean }) {
+function MapViewport({ bounds }: { bounds: L.LatLngBounds }) {
   const map = useMap();
-
   useEffect(() => {
-    map.fitBounds(mapBounds, { padding: [22, 22], animate: false });
-    const timer = window.setTimeout(() => map.invalidateSize(), 90);
-    return () => window.clearTimeout(timer);
-  }, [map, started]);
-
+    map.flyToBounds(bounds, { padding: [40, 40], duration: 1.25 });
+  }, [map, bounds]);
   return null;
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return <div className="info-row"><span>{label}</span><strong>{value}</strong></div>;
+function InfoRow({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
+  return (
+    <div className="dossier-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <span className="row-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#8899ac' }}>
+        {icon} {label}
+      </span>
+      <strong className="row-val" style={{ textAlign: 'right', maxWidth: '60%', color: '#e2e8f0', lineHeight: '1.2' }}>{value}</strong>
+    </div>
+  );
 }
 
 function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
-  return <div className="route-metric">{icon}<span>{label}</span><strong>{value}</strong></div>;
+  return (
+    <div className="route-metric">
+      {icon}
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
 }
 
 function pointAtProgress(points: Coordinate[], progress: number): Coordinate {
   const safeProgress = Math.max(0, Math.min(1, progress));
-  const segments = points.slice(1).map((point, index) => {
-    const previous = points[index];
-    return { from: previous, to: point, distance: roughDistance(previous, point) };
-  });
-  const total = segments.reduce((sum, segment) => sum + segment.distance, 0);
-  let travelled = safeProgress * total;
-
-  for (const segment of segments) {
-    if (travelled <= segment.distance) {
-      const ratio = segment.distance === 0 ? 0 : travelled / segment.distance;
-      return [
-        segment.from[0] + (segment.to[0] - segment.from[0]) * ratio,
-        segment.from[1] + (segment.to[1] - segment.from[1]) * ratio,
-      ];
-    }
-    travelled -= segment.distance;
-  }
-
-  return points[points.length - 1];
+  const index = Math.min(points.length - 1, Math.floor(safeProgress * (points.length - 1)));
+  return points[index];
 }
 
-function roughDistance(from: Coordinate, to: Coordinate) {
-  const latKm = (to[0] - from[0]) * 111;
-  const lngKm = (to[1] - from[1]) * 111 * Math.cos(((from[0] + to[0]) / 2) * Math.PI / 180);
-  return Math.hypot(latKm, lngKm);
-}
-
-function midpoint(points: Coordinate[]) {
-  return points[Math.floor(points.length / 2)];
-}
-
-function routeLabelPoint(points: Coordinate[]) {
-  return pointAtProgress(points, .55);
-}
-
-function formatDateAtProgress(startDate: string, durationDays: number, progress: number) {
-  const start = new Date(`${startDate}T00:00:00Z`).getTime();
-  const current = start + durationDays * progress * 24 * 60 * 60 * 1000;
-  return dateFormatter.format(new Date(current));
-}
-
-function buildComparison(route: CandidateRoute) {
-  return {
-    shorterPct: Math.max(0, Math.round((1 - route.distanceKm / historicalRoute.distanceKm) * 100)),
-    fuelPct: Math.max(0, Math.round((1 - route.fuelUsed / historicalRoute.fuelUsed) * 100)),
-    fewerHazards: Math.max(0, historicalRoute.hazardsNear - route.hazardsNear),
-  };
-}
-
-function shipIcon(state: 'live' | 'parked') {
+function shipIcon() {
   return L.divIcon({
-    className: `ship-div-icon ${state}`,
-    html: '<span class="ship-core"><span class="ship-nose"></span></span>',
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-  });
-}
-
-function ghostShipIcon() {
-  return L.divIcon({
-    className: 'ship-div-icon ghost',
-    html: '<span class="ship-core"><span class="ship-nose"></span></span>',
+    className: 'ship-div-icon live',
+    html: '<span class="ship-core"></span>',
     iconSize: [28, 28],
     iconAnchor: [14, 14],
-  });
-}
-
-function icebergIcon(sizeCategory: string) {
-  return L.divIcon({
-    className: 'iceberg-div-icon',
-    html: `<span class="iceberg-shape"><i>${sizeCategory}</i></span>`,
-    iconSize: [34, 34],
-    iconAnchor: [17, 17],
   });
 }
 
@@ -480,25 +709,7 @@ function portIcon(code: string) {
   return L.divIcon({
     className: 'port-div-icon',
     html: `<span>${code}</span>`,
-    iconSize: [44, 24],
-    iconAnchor: [22, 12],
-  });
-}
-
-function stationIcon() {
-  return L.divIcon({
-    className: 'station-div-icon',
-    html: '<span>BHARATI</span>',
-    iconSize: [76, 26],
-    iconAnchor: [38, 13],
-  });
-}
-
-function labelIcon(label: string, className: string) {
-  return L.divIcon({
-    className: `route-label-div-icon ${className}`,
-    html: `<span>${label}</span>`,
-    iconSize: [150, 24],
-    iconAnchor: [75, 12],
+    iconSize: [44, 22],
+    iconAnchor: [22, 11],
   });
 }
