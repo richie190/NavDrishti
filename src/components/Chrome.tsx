@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowDown, ArrowUpRight, Compass, Pause, Play, X } from 'lucide-react';
+import { ArrowDown, ArrowUpRight, Compass, Pause, Play, UserRound, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { chapters } from '../data/mission';
 
@@ -16,8 +16,8 @@ export function Loading({ ready, failed, reduced }: { ready: boolean; failed: bo
   </motion.div>}</AnimatePresence>;
 }
 
-export function Header({ go, command, tour, setTour }: { go: (id: string) => void; command: () => void; tour: boolean; setTour: (value: boolean) => void }) {
-  return <header className="site-header"><Brand onClick={() => go('arrival')} /><nav aria-label="Main navigation"><button onClick={() => go('ice')}>The mission</button><button onClick={() => go('twin')}>Digital twin</button><button onClick={() => go('simulation')}>Simulator</button></nav><div className="header-actions"><button className="film-button" onClick={() => setTour(!tour)} aria-label={tour ? 'Pause guided tour' : 'Play guided tour'}>{tour ? <Pause size={13} fill="currentColor" /> : <Play size={13} fill="currentColor" />}<span>{tour ? 'PAUSE FILM' : 'PLAY FILM'}</span></button><button className="command-button" onClick={command}><span>Command center</span><ArrowUpRight size={16} /></button></div></header>;
+export function Header({ go, command, login, tour, setTour }: { go: (id: string) => void; command: () => void; login: () => void; tour: boolean; setTour: (value: boolean) => void }) {
+  return <header className="site-header"><Brand onClick={() => go('arrival')} /><nav aria-label="Main navigation"><button onClick={() => go('ice')}>The mission</button><button onClick={() => go('twin')}>Digital twin</button><button onClick={() => go('simulation')}>Simulator</button></nav><div className="header-actions"><button className="film-button" onClick={() => setTour(!tour)} aria-label={tour ? 'Pause guided tour' : 'Play guided tour'}>{tour ? <Pause size={13} fill="currentColor" /> : <Play size={13} fill="currentColor" />}<span>{tour ? 'PAUSE FILM' : 'PLAY FILM'}</span></button><button className="login-button" onClick={login}><UserRound size={14} /><span>LOGIN</span></button><button className="command-button" onClick={command}><span>Command center</span><ArrowUpRight size={16} /></button></div></header>;
 }
 
 export function JourneyChrome({ active, go, lite, setLite, tour }: { active: number; go: (id: string) => void; lite: boolean; setLite: (value: boolean) => void; tour: boolean }) {

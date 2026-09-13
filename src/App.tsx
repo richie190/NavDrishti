@@ -6,6 +6,7 @@ import { useExperience } from './hooks/useExperience';
 import { Header, JourneyChrome, Loading } from './components/Chrome';
 import Story from './components/Story';
 import CommandCenter from './components/CommandCenter';
+import Login from './components/Login';
 import type { SceneControls } from './data/mission';
 
 const World = lazy(() => import('./scenes/World'));
@@ -21,6 +22,7 @@ export default function App() {
   return <Routes>
     <Route path="/" element={<LandingPage />} />
     <Route path="/command-center" element={<CommandCenter />} />
+    <Route path="/login" element={<Login />} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>;
 }
@@ -75,7 +77,7 @@ function LandingPage() {
       {!failed ? <RenderBoundary onError={handleFailure}><Suspense fallback={null}><World motion={motion} lite={lite} active={active} onReady={handleReady} onFailure={handleFailure} onStation={selectStation} /></Suspense></RenderBoundary> : <div className="fallback-scene"><div className="fallback-mountain" /><div className="fallback-ocean" /></div>}
     </div>
     <div className="scene-shade" /><div className="film-grain" /><div className="frame-corner top-left" /><div className="frame-corner bottom-right" />
-    <Header go={go} command={command} tour={tour} setTour={setTour} />
+    <Header go={go} command={command} login={() => navigate('/login')} tour={tour} setTour={setTour} />
     {failed && <div className="render-notice" role="status"><ChromeIcon size={14} /> Simplified view. WebGL could not start. <button onClick={() => { setFailed(false); setReady(false); setLite(true); }}>Retry in eco mode</button></div>}
     <Story go={go} command={command} controls={controls} setControl={setControl} station={station} setStation={setStation} scenario={scenario} setScenario={setScenario} running={running} progress={progress} run={run} reduced={reduced} />
     <JourneyChrome active={active} go={go} lite={lite} setLite={setLite} tour={tour} />
