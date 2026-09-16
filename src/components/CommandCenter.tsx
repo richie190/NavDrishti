@@ -1,4 +1,4 @@
-import 'leaflet/dist/leaflet.css';
+﻿import 'leaflet/dist/leaflet.css';
 import * as L from 'leaflet';
 import { motion } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -22,18 +22,28 @@ import {
   Timer,
 } from 'lucide-react';
 
+import PolarChatbot from './PolarChatbot'; // Make sure PolarChatbot.tsx is in the same directory
+
 type SimulationMode = 'idle' | 'replay' | 'complete';
 type Coordinate = [number, number];
+type RouteType = 'historical' | 'safest' | 'fastest' | 'fuel';
+
+interface IcebergSighting {
+  id: string;
+  position: Coordinate;
+  size: 'small' | 'medium' | 'large';
+  note: string;
+}
 
 const analysisStages = [
-  'Fetching satellite imagery',
-  'Retrieving live ice-chart data',
-  'Processing sea-ice conditions',
-  'Running route-optimisation algorithm',
+  'Ingesting SAR imagery (Copernicus Sentinel-1)',
+  'Retrieving real-time ice data (NSIDC/AMSR2)',
+  'Processing hydrographic & drift telemetry',
+  'Running Polaris risk-optimisation algorithm',
 ];
 
 export interface RouteOption {
-  type: 'historical' | 'safest' | 'fastest' | 'fuel';
+  type: RouteType;
   label: string;
   badge: string;
   color: string;
@@ -62,6 +72,9 @@ export interface CaseStudy {
   destination: string;
   startCoords: Coordinate;
   endCoords: Coordinate;
+  recommendedRouteType: RouteType;
+  recommendationReason: string;
+  icebergs: IcebergSighting[];
   routes: RouteOption[];
 }
 
@@ -86,58 +99,68 @@ const caseStudies: CaseStudy[] = [
     destination: 'King George Island',
     startCoords: [-54.8, -68.3],
     endCoords: [-62.2, -58.9],
+    recommendedRouteType: 'safest',
+    recommendationReason: 'Avoid the dense Bransfield Strait iceberg field that caused the original loss.',
+    icebergs: [
+      [-57.5, -64.8], [-58.5, -63.6], [-59.5, -62.4], [-58.0, -62.5], [-59.0, -61.0], [-60.5, -60.0]
+    ].map((position, index) => ({
+      id: `explorer-berg-${index + 1}`,
+      position: position as Coordinate,
+      size: index % 6 === 0 ? 'large' : index % 3 === 0 ? 'medium' : 'small',
+      note: index % 6 === 0 ? 'Large multi-year iceberg detected near the historical corridor.' : 'Iceberg or growler sighting in dense pack ice.',
+    })),
     routes: [
       {
         type: 'historical',
         label: 'Historical Route (Crash Site)',
         badge: 'CRASHED',
-        color: '#FF4155', 
+        color: '#FF4155',
         etaDays: 5.5,
         fuelUsed: 145,
         distanceKm: 1280,
         polarisRIO: -12,
         hazardsNear: 14,
         description: 'Direct passage through thick multi-year pack ice. Lead to hull breach and sinking.',
-        points: [[-54.8, -68.3], [-57.5, -65.1], [-60.2, -61.8], [-62.2, -58.9]],
+        points: [[-54.8, -68.3], [-58.5, -63.6], [-62.2, -58.9]],
       },
       {
         type: 'safest',
-        label: 'Safest Route (AI Preferred)',
+        label: 'Safest Route (Recommended)',
         badge: 'RECOMMENDED',
-        color: '#10B981', 
+        color: '#10B981',
         etaDays: 4.8,
         fuelUsed: 105,
         distanceKm: 1390,
         polarisRIO: 8,
-        hazardsNear: 1,
+        hazardsNear: 0,
         description: 'Wide western detachment around Bransfield Strait multi-year ice fields.',
-        points: [[-54.8, -68.3], [-56.8, -69.5], [-59.9, -64.2], [-62.2, -58.9]],
+        points: [[-54.8, -68.3], [-56.0, -71.0], [-61.0, -66.0], [-62.2, -58.9]],
       },
       {
         type: 'fastest',
         label: 'Fastest Route',
         badge: 'HIGH RISK',
-        color: '#F59E0B', 
+        color: '#F59E0B',
         etaDays: 4.1,
         fuelUsed: 128,
         distanceKm: 1210,
         polarisRIO: -4,
         hazardsNear: 8,
         description: 'Skirts northern ice edge at maximum service speed; vulnerable to growlers.',
-        points: [[-54.8, -68.3], [-57.1, -64.0], [-60.8, -60.5], [-62.2, -58.9]],
+        points: [[-54.8, -68.3], [-57.0, -61.0], [-62.2, -58.9]],
       },
       {
         type: 'fuel',
         label: 'Fuel Efficient Route',
         badge: 'ECO-PASSAGE',
-        color: '#06B6D4', 
+        color: '#06B6D4',
         etaDays: 5.0,
         fuelUsed: 92,
         distanceKm: 1295,
         polarisRIO: 4,
         hazardsNear: 3,
         description: 'Leverages Antarctic Circumpolar drift currents to cut fuel consumption by 36%.',
-        points: [[-54.8, -68.3], [-57.8, -66.8], [-60.5, -62.0], [-62.2, -58.9]],
+        points: [[-54.8, -68.3], [-59.0, -67.0], [-62.2, -58.9]],
       },
     ],
   },
@@ -158,58 +181,68 @@ const caseStudies: CaseStudy[] = [
     destination: 'Maitri Station / Queen Maud Land',
     startCoords: [-33.9, 18.4],
     endCoords: [-70.7, 11.7],
+    recommendedRouteType: 'safest',
+    recommendationReason: 'Use the open-lead corridor and preserve fuel reserves instead of entering closing pack ice.',
+    icebergs: [
+      [-60.0, 15.0], [-62.0, 14.5], [-64.0, 14.0], [-66.0, 13.5], [-63.0, 12.0], [-65.0, 16.0], [-68.0, 13.0]
+    ].map((position, index) => ({
+      id: `magdalena-berg-${index + 1}`,
+      position: position as Coordinate,
+      size: index % 5 === 0 ? 'large' : index % 2 === 0 ? 'medium' : 'small',
+      note: 'Mock iceberg sighting in a rapidly closing pack-ice zone.',
+    })),
     routes: [
       {
         type: 'historical',
         label: 'Historical Route (Trapped Site)',
         badge: 'BESET IN ICE',
-        color: '#FF4155', 
+        color: '#FF4155',
         etaDays: 19.2,
         fuelUsed: 890,
         distanceKm: 4620,
         polarisRIO: -8,
         hazardsNear: 18,
         description: 'Trapped in closing ice leads in Muskegbukta Bay due to delayed ice chart data.',
-        points: [[-33.9, 18.4], [-44.2, 16.1], [-56.8, 14.2], [-65.1, 12.8], [-70.7, 11.7]],
+        points: [[-33.9, 18.4], [-55.0, 16.0], [-65.0, 14.0], [-70.7, 11.7]],
       },
       {
         type: 'safest',
-        label: 'Safest Route (AI Preferred)',
+        label: 'Safest Route (Recommended)',
         badge: 'RECOMMENDED',
-        color: '#10B981', 
+        color: '#10B981',
         etaDays: 14.1,
         fuelUsed: 540,
         distanceKm: 4450,
         polarisRIO: 10,
-        hazardsNear: 2,
+        hazardsNear: 0,
         description: 'Navigates open leads identified by predictive SAR satellite trajectories.',
-        points: [[-33.9, 18.4], [-45.0, 22.1], [-57.1, 20.4], [-66.0, 16.2], [-70.7, 11.7]],
+        points: [[-33.9, 18.4], [-50.0, 28.0], [-62.0, 25.0], [-70.7, 11.7]],
       },
       {
         type: 'fastest',
         label: 'Fastest Route',
         badge: 'DIRECT SPRINT',
-        color: '#F59E0B', 
+        color: '#F59E0B',
         etaDays: 12.8,
         fuelUsed: 670,
         distanceKm: 4210,
         polarisRIO: 2,
         hazardsNear: 6,
         description: 'Straight Great-Circle route through thin first-year pack ice corridor.',
-        points: [[-33.9, 18.4], [-43.8, 17.5], [-55.2, 15.0], [-64.8, 13.1], [-70.7, 11.7]],
+        points: [[-33.9, 18.4], [-55.0, 10.0], [-65.0, 9.0], [-70.7, 11.7]],
       },
       {
         type: 'fuel',
         label: 'Fuel Efficient Route',
         badge: 'OPTIMIZED',
-        color: '#06B6D4', 
+        color: '#06B6D4',
         etaDays: 13.9,
         fuelUsed: 480,
         distanceKm: 4320,
         polarisRIO: 7,
         hazardsNear: 3,
         description: 'Minimizes ice-ramming manoeuvres, reducing fuel burn by 46% compared to actual trip.',
-        points: [[-33.9, 18.4], [-44.5, 19.8], [-56.5, 17.8], [-65.2, 14.5], [-70.7, 11.7]],
+        points: [[-33.9, 18.4], [-55.0, 22.0], [-65.0, 20.0], [-70.7, 11.7]],
       },
     ],
   },
@@ -225,63 +258,73 @@ const caseStudies: CaseStudy[] = [
     iceResistance: 'Russian Arc7 Ice Class (Heavy diesel-electric icebreaker)',
     crewPassengers: '41st Indian Expedition Team & Crew',
     incidentDetails:
-      'Successful resupply mission to India’s Maitri and Bharati research stations. Traversed dense pack ice without incident, hull fatigue, or schedule delays.',
+      "Successful resupply mission to India's Maitri and Bharati research stations. Traversed dense pack ice without incident, hull fatigue, or schedule delays.",
     startPort: 'Cape Town (CPT)',
     destination: 'Bharati Station (Larsemann Hills)',
     startCoords: [-33.9, 18.4],
     endCoords: [-69.4, 76.2],
+    recommendedRouteType: 'fuel',
+    recommendationReason: "The ice-strengthened vessel can use the lower-resistance southern corridor to save fuel while retaining a positive safety margin.",
+    icebergs: [
+      [-55.0, 45.0], [-60.0, 52.0], [-63.0, 68.0], [-67.0, 70.0], [-58.0, 60.0], [-66.0, 62.0], [-64.0, 55.0]
+    ].map((position, index) => ({
+      id: `vasiliy-berg-${index + 1}`,
+      position: position as Coordinate,
+      size: index === 2 ? 'large' : index % 2 === 0 ? 'medium' : 'small',
+      note: "Mock iceberg sighting monitored by the vessel's ice-navigation team.",
+    })),
     routes: [
       {
         type: 'historical',
         label: 'Historical Route (Executed)',
         badge: 'COMPLETED',
-        color: '#FF4155', 
+        color: '#FF4155',
         etaDays: 12.2,
         fuelUsed: 460,
         distanceKm: 5120,
         polarisRIO: 6,
         hazardsNear: 5,
         description: 'Original route executed using standard ice navigators and helicopter reconnaissance.',
-        points: [[-33.9, 18.4], [-46.1, 35.2], [-58.4, 52.1], [-65.2, 68.0], [-69.4, 76.2]],
+        points: [[-33.9, 18.4], [-55.0, 45.0], [-65.0, 65.0], [-69.4, 76.2]],
       },
       {
         type: 'safest',
-        label: 'Safest Route (AI Preferred)',
+        label: 'Safest Route (Recommended)',
         badge: 'RECOMMENDED',
-        color: '#10B981', 
+        color: '#10B981',
         etaDays: 11.0,
         fuelUsed: 390,
         distanceKm: 4980,
         polarisRIO: 14,
-        hazardsNear: 1,
+        hazardsNear: 0,
         description: 'Bypasses iceberg cluster off Prydz Bay using AI drift forecasting.',
-        points: [[-33.9, 18.4], [-45.5, 38.0], [-57.0, 56.4], [-64.8, 71.0], [-69.4, 76.2]],
+        points: [[-33.9, 18.4], [-45.0, 55.0], [-55.0, 75.0], [-69.4, 76.2]],
       },
       {
         type: 'fastest',
         label: 'Fastest Route',
         badge: 'EXPRESS PASSAGE',
-        color: '#F59E0B', 
+        color: '#F59E0B',
         etaDays: 9.8,
         fuelUsed: 430,
         distanceKm: 4790,
         polarisRIO: 9,
         hazardsNear: 4,
         description: 'Direct high-latitude transit leveraging Arc7 hull ice-breaking capability.',
-        points: [[-33.9, 18.4], [-47.0, 36.5], [-59.1, 54.0], [-66.1, 70.2], [-69.4, 76.2]],
+        points: [[-33.9, 18.4], [-60.0, 40.0], [-67.0, 60.0], [-69.4, 76.2]],
       },
       {
         type: 'fuel',
         label: 'Fuel Efficient Route',
         badge: 'ECO-PASSAGE',
-        color: '#06B6D4', 
+        color: '#06B6D4',
         etaDays: 10.5,
         fuelUsed: 350,
         distanceKm: 4890,
         polarisRIO: 12,
         hazardsNear: 2,
         description: 'Optimized throttle profiling saving 110 tonnes of station resupply fuel.',
-        points: [[-33.9, 18.4], [-45.8, 37.1], [-57.8, 55.2], [-65.0, 70.5], [-69.4, 76.2]],
+        points: [[-33.9, 18.4], [-52.0, 50.0], [-60.0, 65.0], [-69.4, 76.2]],
       },
     ],
   },
@@ -290,12 +333,8 @@ const caseStudies: CaseStudy[] = [
 // Helper to dynamically calculate precise map bounds based on selected case study
 function getCaseBounds(caseStudy: CaseStudy): L.LatLngBounds {
   const allPoints = caseStudy.routes.flatMap(r => r.points);
-  const lats = allPoints.map(p => p[0]);
-  const lngs = allPoints.map(p => p[1]);
-  return L.latLngBounds(
-    [Math.min(...lats) - 2, Math.min(...lngs) - 4],
-    [Math.max(...lats) + 2, Math.max(...lngs) + 4]
-  );
+  const icebergPoints = caseStudy.icebergs.map(b => b.position);
+  return L.latLngBounds([...allPoints, ...icebergPoints] as L.LatLngExpression[]);
 }
 
 export default function CommandCenter() {
@@ -304,7 +343,7 @@ export default function CommandCenter() {
   const [selectedRouteType, setSelectedRouteType] = useState<string>('safest');
   const [mode, setMode] = useState<SimulationMode>('idle');
   const [progress, setProgress] = useState(0);
-  const [heatmapOn, setHeatmapOn] = useState(false);
+  const [heatmapOn, setHeatmapOn] = useState(true);
   const [isAnalysing, setIsAnalysing] = useState(false);
   const frame = useRef(0);
   const analysisTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -318,22 +357,20 @@ export default function CommandCenter() {
 
   const handleSelectCase = (index: number) => {
     setActiveCaseIndex(index);
-    setSelectedRouteType('safest');
+    setSelectedRouteType(caseStudies[index].recommendedRouteType);
     setMode('idle');
     setProgress(0);
-    setIsAnalysing(false);
+    setIsAnalysing(true);
     if (analysisTimer.current) clearTimeout(analysisTimer.current);
+    analysisTimer.current = setTimeout(() => {
+      setIsAnalysing(false);
+    }, 4600);
   };
 
   const startReplay = () => {
     if (!activeCase) return;
-    setIsAnalysing(true);
-    setMode('idle');
+    setMode('replay');
     setProgress(0);
-    analysisTimer.current = setTimeout(() => {
-      setIsAnalysing(false);
-      setMode('replay');
-    }, 5000);
   };
 
   useEffect(() => () => {
@@ -349,7 +386,7 @@ export default function CommandCenter() {
       const delta = time - lastTime;
       lastTime = time;
       setProgress(prev => {
-        const next = prev + (delta * 1.5) / 30000; // Hardcoded optimal simulation speed
+        const next = prev + (delta * 1.5) / 30000;
         if (next >= 1) {
           setMode('complete');
           return 1;
@@ -382,7 +419,6 @@ export default function CommandCenter() {
       </header>
 
       <section className="command-layout" aria-label="Antarctic route decision dashboard">
-        {/* Compact, anti-scroll Left Panel */}
         <aside className="command-side-panel left" style={{ paddingBottom: '12px', display: 'flex', flexDirection: 'column' }}>
           <div className="panel-heading" style={{ marginBottom: '12px' }}>
             <Ship size={17} />
@@ -399,10 +435,10 @@ export default function CommandCenter() {
                   textAlign: 'left',
                   padding: '10px 14px',
                   borderRadius: '6px',
-                  border: activeCaseIndex === idx ? '2px solid #4dd2ff' : '1px solid rgba(255, 255, 255, 0.1)',
-                  backgroundColor: activeCaseIndex === idx ? 'rgba(77, 210, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                  border: activeCaseIndex === idx ? '2px solid #1E60D5' : '1px solid rgba(0, 71, 171, 0.35)',
+                  backgroundColor: activeCaseIndex === idx ? 'rgba(30, 96, 213, 0.12)' : 'rgba(0, 38, 99, 0.3)',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.2s ease',
                 }}
               >
                 <div style={{ fontSize: '13px', fontWeight: 600, color: activeCaseIndex === idx ? '#fff' : '#a0b3c6', marginBottom: '2px' }}>
@@ -436,7 +472,7 @@ export default function CommandCenter() {
               <InfoRow label="Fuel Capacity" value={activeCase.fuelLimit} icon={<Fuel size={13} />} />
               <InfoRow label="Ice Resistance" value={activeCase.iceResistance} icon={<ShieldAlert size={13} />} />
               <InfoRow label="Personnel" value={activeCase.crewPassengers} icon={<Anchor size={13} />} />
-              <InfoRow label="Passage" value={`${activeCase.startPort} → ${activeCase.destination}`} icon={<Compass size={13} />} />
+              <InfoRow label="Passage" value={`${activeCase.startPort} to ${activeCase.destination}`} icon={<Compass size={13} />} />
             </div>
 
             <div className="incident-summary" style={{ marginTop: 'auto', padding: '12px', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
@@ -476,6 +512,54 @@ export default function CommandCenter() {
             </button>
           </div>
 
+          {/* Visual Map Legend */}
+          <div className="map-visual-legend" style={{
+            position: 'absolute',
+            top: '65px',
+            right: '14px',
+            zIndex: 500,
+            background: 'rgba(0, 23, 54, 0.85)',
+            backdropFilter: 'blur(8px)',
+            padding: '12px 14px',
+            borderRadius: '8px',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            minWidth: '180px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
+          }}>
+            <div style={{ color: '#8ca8b4', fontSize: '9px', fontWeight: 'bold', letterSpacing: '0.05em', marginBottom: '2px' }}>
+              MAP LEGEND
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {activeCase.routes.map(r => (
+                <div key={r.type} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ 
+                    width: '24px', 
+                    height: r.type === 'historical' ? '0px' : '3px', 
+                    background: r.type === 'historical' ? 'transparent' : r.color,
+                    borderTop: r.type === 'historical' ? `3px dashed ${r.color}` : 'none',
+                    borderRadius: '2px'
+                  }}></div>
+                  <span style={{ fontSize: '11px', color: '#fff' }}>{r.label}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                background: 'rgba(0, 229, 255, 0.2)',
+                border: '1.5px dashed #00e5ff',
+                borderRadius: '50%'
+              }}></div>
+              <span style={{ fontSize: '11px', color: '#fff' }}>Iceberg Danger Zone</span>
+            </div>
+          </div>
+
           <MapShell
             activeCase={activeCase}
             selectedRouteType={selectedRouteType}
@@ -484,6 +568,7 @@ export default function CommandCenter() {
             heatmapOn={heatmapOn}
             dynamicBounds={dynamicBounds}
             onSelectRoute={type => setSelectedRouteType(type)}
+            isAnalysing={isAnalysing}
           />
 
           <div className="map-overlay-bottom">
@@ -522,43 +607,63 @@ export default function CommandCenter() {
             <span>ROUTE COMPARISON</span>
           </div>
 
-          {selectedRoute ? <motion.div
-            key={selectedRoute.type}
-            className="route-detail-card"
-            initial={{ opacity: 0, x: 12 }}
-            animate={{ opacity: 1, x: 0 }}
-          >
-            <div className="route-detail-heading">
-              <span style={{ color: selectedRoute.color }}>{selectedRoute.label}</span>
-              <small className="mono">{selectedRoute.badge}</small>
+          {activeCase && selectedRoute ? <>
+            <div style={{
+              margin: '12px 0',
+              padding: '10px 12px',
+              borderRadius: '6px',
+              border: '1px solid rgba(30, 96, 213, 0.4)',
+              background: 'rgba(0, 38, 99, 0.35)',
+              fontSize: '11px',
+              lineHeight: '1.5',
+              color: '#a8c4e8',
+            }}>
+              <p style={{ margin: '0 0 4px', fontFamily: 'var(--mono)', fontSize: '9px', letterSpacing: '0.1em', color: '#1E60D5' }}>
+                AI RECOMMENDATION
+              </p>
+              <p style={{ margin: 0 }}>{activeCase.recommendationReason}</p>
             </div>
+            <motion.div
+              key={selectedRoute.type}
+              className="route-detail-card"
+              initial={{ opacity: 0, x: 12 }}
+              animate={{ opacity: 1, x: 0 }}
+            >
+              <div className="route-detail-heading">
+                <span style={{ color: selectedRoute.color }}>{selectedRoute.label}</span>
+                <small className="mono">{selectedRoute.badge}</small>
+              </div>
 
-            <div className="rio-readout">
-              <span>POLARIS RIO SCORE</span>
-              <strong style={{ color: selectedRoute.polarisRIO < 0 ? '#FF4155' : '#10B981' }}>
-                {selectedRoute.polarisRIO > 0 ? `+${selectedRoute.polarisRIO}` : selectedRoute.polarisRIO}
-              </strong>
-              <p>{selectedRoute.polarisRIO < 0 ? 'High Risk Corridor (Danger)' : 'Safe Passage Permitted'}</p>
-            </div>
+              <div className="rio-readout">
+                <span>POLARIS RIO SCORE</span>
+                <strong style={{ color: selectedRoute.polarisRIO < 0 ? '#FF4155' : '#10B981' }}>
+                  {selectedRoute.polarisRIO > 0 ? `+${selectedRoute.polarisRIO}` : selectedRoute.polarisRIO}
+                </strong>
+                <p>{selectedRoute.polarisRIO < 0 ? 'High Risk Corridor (Danger)' : 'Safe Passage Permitted'}</p>
+              </div>
 
-            <div className="route-stat-grid">
-              <Metric icon={<Timer size={14} />} label="ETA" value={`${selectedRoute.etaDays} days`} />
-              <Metric icon={<Fuel size={14} />} label="Fuel Usage" value={`${numberFormatter.format(selectedRoute.fuelUsed)} t`} />
-              <Metric icon={<RouteIcon size={14} />} label="Distance" value={`${numberFormatter.format(selectedRoute.distanceKm)} km`} />
-              <Metric icon={<AlertTriangle size={14} />} label="Hazards Near" value={String(selectedRoute.hazardsNear)} />
-            </div>
+              <div className="route-stat-grid">
+                <Metric icon={<Timer size={14} />} label="ETA" value={`${selectedRoute.etaDays} days`} />
+                <Metric icon={<Fuel size={14} />} label="Fuel Usage" value={`${numberFormatter.format(selectedRoute.fuelUsed)} t`} />
+                <Metric icon={<RouteIcon size={14} />} label="Distance" value={`${numberFormatter.format(selectedRoute.distanceKm)} km`} />
+                <Metric icon={<AlertTriangle size={14} />} label="Hazards Near" value={String(selectedRoute.hazardsNear)} />
+              </div>
 
-            <div className="route-description-box">
-              <p className="eyebrow">PASSAGE SUMMARY</p>
-              <p>{selectedRoute.description}</p>
-            </div>
-          </motion.div> : <SelectionNote
+              <div className="route-description-box">
+                <p className="eyebrow">PASSAGE SUMMARY</p>
+                <p>{selectedRoute.description}</p>
+              </div>
+            </motion.div>
+          </> : <SelectionNote
             icon={<RouteIcon size={22} />}
             title="Route comparison awaits"
             description="Select a case study to compare safety, speed, fuel use, and nearby hazards."
           />}
         </aside>
       </section>
+
+      {/* Floating Polar Chatbot (Bottom Right) */}
+      <PolarChatbot />
     </main>
   );
 }
@@ -589,6 +694,7 @@ function MapShell({
   heatmapOn,
   dynamicBounds,
   onSelectRoute,
+  isAnalysing,
 }: {
   activeCase: CaseStudy;
   selectedRouteType: string;
@@ -597,6 +703,7 @@ function MapShell({
   heatmapOn: boolean;
   dynamicBounds: L.LatLngBounds;
   onSelectRoute: (type: string) => void;
+  isAnalysing: boolean;
 }) {
   const selectedRoute = activeCase.routes.find(r => r.type === selectedRouteType) ?? activeCase.routes[1];
   const shipPos = mode === 'replay' ? pointAtProgress(selectedRoute.points, progress) : activeCase.routes[0].points[0];
@@ -615,23 +722,27 @@ function MapShell({
       >
         <MapViewport bounds={dynamicBounds} />
 
-        {heatmapOn && activeCase.routes.flatMap(route => route.points.slice(1, -1)).map((position, index) => (
-          <Circle
-            key={`${position.join('-')}-${index}`}
-            center={position}
-            radius={90000}
-            pathOptions={{
-              className: 'heatmap-cell',
-              color: '#4dd2ff',
-              fillColor: '#4dd2ff',
-              fillOpacity: 0.16,
-              opacity: 0,
-              weight: 0,
-            }}
-          />
-        ))}
+        {!isAnalysing && heatmapOn && activeCase.icebergs.map((berg) => {
+          const baseRadius = activeCase.id === 'explorer-2007' ? 35000 : activeCase.id === 'magdalena-2002' ? 160000 : 160000;
+          const sizeMultiplier = berg.size === 'large' ? 1.5 : berg.size === 'medium' ? 1.2 : 0.8;
+          return (
+            <Circle
+              key={berg.id}
+              center={berg.position}
+              radius={baseRadius * sizeMultiplier}
+              pathOptions={{
+                className: 'heatmap-cell',
+                color: '#00e5ff',
+                weight: 2,
+                dashArray: '6 8',
+                fillColor: '#00e5ff',
+                fillOpacity: 0.15,
+              }}
+            />
+          );
+        })}
 
-        {activeCase.routes.map(r => {
+        {!isAnalysing && activeCase.routes.map(r => {
           const isSelected = r.type === selectedRouteType;
           return (
             <Polyline
@@ -647,7 +758,7 @@ function MapShell({
               eventHandlers={{ click: () => onSelectRoute(r.type) }}
             >
               <Tooltip sticky>
-                <strong>{r.label}</strong> — RIO: {r.polarisRIO} | Fuel: {r.fuelUsed}t
+                <strong>{r.label}</strong> - RIO: {r.polarisRIO} | Fuel: {r.fuelUsed}t
               </Tooltip>
             </Polyline>
           );
@@ -655,7 +766,7 @@ function MapShell({
 
         <Marker position={activeCase.routes[0].points[0]} icon={portIcon('START')} />
         <Marker position={activeCase.routes[0].points[activeCase.routes[0].points.length - 1]} icon={portIcon('DEST')} />
-        <Marker position={shipPos} icon={shipIcon()} zIndexOffset={1000} />
+        {!isAnalysing && <Marker position={shipPos} icon={shipIcon()} zIndexOffset={1000} />}
       </MapContainer>
     </div>
   );
@@ -664,7 +775,8 @@ function MapShell({
 function MapViewport({ bounds }: { bounds: L.LatLngBounds }) {
   const map = useMap();
   useEffect(() => {
-    map.flyToBounds(bounds, { padding: [40, 40], duration: 1.25 });
+    map.setMinZoom(2); // Unlock before flying
+    map.flyToBounds(bounds, { padding: [120, 120], duration: 1.25 });
   }, [map, bounds]);
   return null;
 }
@@ -692,8 +804,52 @@ function Metric({ icon, label, value }: { icon: ReactNode; label: string; value:
 
 function pointAtProgress(points: Coordinate[], progress: number): Coordinate {
   const safeProgress = Math.max(0, Math.min(1, progress));
-  const index = Math.min(points.length - 1, Math.floor(safeProgress * (points.length - 1)));
-  return points[index];
+  if (points.length < 2) return points[0];
+
+  const segmentDistances = points.slice(1).map((point, index) => greatCircleDistance(points[index], point));
+  const totalDistance = segmentDistances.reduce((total, distance) => total + distance, 0);
+  let distanceTravelled = safeProgress * totalDistance;
+
+  for (let index = 0; index < segmentDistances.length; index += 1) {
+    const segmentDistance = segmentDistances[index];
+    if (distanceTravelled <= segmentDistance || index === segmentDistances.length - 1) {
+      return interpolateGreatCircle(points[index], points[index + 1], segmentDistance === 0 ? 0 : distanceTravelled / segmentDistance);
+    }
+    distanceTravelled -= segmentDistance;
+  }
+
+  return points[points.length - 1];
+}
+
+function greatCircleDistance([fromLat, fromLng]: Coordinate, [toLat, toLng]: Coordinate): number {
+  const toRadians = Math.PI / 180;
+  const latDelta = (toLat - fromLat) * toRadians;
+  const lngDelta = (toLng - fromLng) * toRadians;
+  const a = Math.sin(latDelta / 2) ** 2
+    + Math.cos(fromLat * toRadians) * Math.cos(toLat * toRadians) * Math.sin(lngDelta / 2) ** 2;
+  return 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function interpolateGreatCircle([fromLat, fromLng]: Coordinate, [toLat, toLng]: Coordinate, fraction: number): Coordinate {
+  const toRadians = Math.PI / 180;
+  const toDegrees = 180 / Math.PI;
+  const clampedFraction = Math.max(0, Math.min(1, fraction));
+  const distance = greatCircleDistance([fromLat, fromLng], [toLat, toLng]);
+  if (distance === 0) return [fromLat, fromLng];
+
+  const fromLatRadians = fromLat * toRadians;
+  const fromLngRadians = fromLng * toRadians;
+  const toLatRadians = toLat * toRadians;
+  const toLngRadians = toLng * toRadians;
+  const startWeight = Math.sin((1 - clampedFraction) * distance) / Math.sin(distance);
+  const endWeight = Math.sin(clampedFraction * distance) / Math.sin(distance);
+  const x = startWeight * Math.cos(fromLatRadians) * Math.cos(fromLngRadians)
+    + endWeight * Math.cos(toLatRadians) * Math.cos(toLngRadians);
+  const y = startWeight * Math.cos(fromLatRadians) * Math.sin(fromLngRadians)
+    + endWeight * Math.cos(toLatRadians) * Math.sin(toLngRadians);
+  const z = startWeight * Math.sin(fromLatRadians) + endWeight * Math.sin(toLatRadians);
+
+  return [Math.atan2(z, Math.hypot(x, y)) * toDegrees, Math.atan2(y, x) * toDegrees];
 }
 
 function shipIcon() {
