@@ -23,7 +23,7 @@ export const cameraShots: { position: Point; target: Point; fov: number }[] = [
   { position: [32, 13, 47], target: [0, 4, -6], fov: 47 },
   { position: [-27, 8, 30], target: [5, 3, -7], fov: 52 },
   { position: [27, 9, 15], target: [10, 5, -9], fov: 43 },
-  { position: [40, 67, 62], target: [0, 10, -10], fov: 53 },
+  { position: [42, 112, 75], target: [0, 76, -18], fov: 46 },
   { position: [9, 49, 38], target: [2, 0, -5], fov: 48 },
   { position: [-15, 18, 30], target: [4, 0, -1], fov: 55 },
   { position: [0, 51, 10], target: [0, 0, -9], fov: 57 },
@@ -46,13 +46,13 @@ export const icebergData: { id: string; position: Point; scale: Point; seed: num
 ];
 
 export const features = [
-  ['01', 'Iceberg detection', 'Find the smallest signals in the largest wilderness.', 'detection'],
-  ['02', 'Trajectory prediction', 'Turn yesterday\'s drift into tomorrow\'s foresight.', 'prediction'],
-  ['03', 'Route intelligence', 'A better passage. Before the passage becomes a problem.', 'reroute'],
-  ['04', 'Sea ice intelligence', 'Understand concentration, coverage, and changing conditions.', 'twin'],
-  ['05', 'Weather + ocean', 'Wind, waves, currents. Every force in the equation.', 'analysis'],
-  ['06', 'Early risk alerts', 'The right warning. While there is still time to act.', 'conflict'],
-  ['07', 'Offline resilience', 'Critical guidance from synchronized data, beyond the signal.', 'simulation'],
+  ['01', 'Hybrid route search', 'Isochrone for the voyage. A* at the hazard boundary.', 'reroute'],
+  ['02', 'POLARIS assessment', 'Ice class, ice type and concentration inform vessel-specific risk.', 'analysis'],
+  ['03', 'AIS + 12-hour review', 'Position-triggered checks alongside scheduled route reassessment.', 'conflict'],
+  ['04', 'Vessel-aware decisions', 'Account for ice class, draft, speed and fuel constraints.', 'twin'],
+  ['05', 'Multi-source fusion', 'Ice, iceberg tracks, wind and currents in a shared spatial context.', 'satellite'],
+  ['06', 'Officer approval', 'Three explained options. The final decision stays with the officer.', 'reroute'],
+  ['07', 'Offline-first design', 'Cached data, visible age and proposed satellite delta-sync.', 'simulation'],
 ];
 
 export const scenarios = [

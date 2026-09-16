@@ -1,4 +1,4 @@
-import { chromium } from '@playwright/test';
+import { chromium, expect } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 
 await mkdir('artifacts', { recursive: true });
@@ -34,10 +34,20 @@ try {
   await page.waitForTimeout(200);
   const oceanLater = await oceanUniforms();
   if (!oceanStart || oceanLater.time <= oceanStart.time) throw new Error('Ocean time is not reaching the live GPU material.');
-  for (const [id, file] of [['detection', '02-scan'], ['conflict', '03-conflict'], ['escape', '04-passage'], ['twin', '05-twin']]) {
+  for (const [id, file] of [['detection', '02-scan'], ['satellite', '02b-orbit'], ['conflict', '03-conflict'], ['escape', '04-passage'], ['twin', '05-twin']]) {
     await page.evaluate(id => window.scrollTo(0, document.getElementById(id).offsetTop), id);
     await page.waitForTimeout(1800);
     await page.screenshot({ path: `artifacts/${file}.png` });
+    if (id === 'satellite') {
+      const orbital = await page.evaluate(async () => {
+        const source = performance.getEntriesByType('resource').map(entry => entry.name).find(name => name.includes('/@react-three_fiber.js'));
+        const { _roots } = await import(source);
+        const scene = _roots.get(document.querySelector('canvas')).store.getState().scene;
+        const globe = scene.getObjectByName('polar-orbital-view');
+        return { globe: globe.visible, surface: scene.getObjectByName('antarctic-surface').visible, landVertices: globe.children[1].geometry.attributes.position.count };
+      });
+      if (!orbital.globe || orbital.surface || orbital.landVertices < 100) throw new Error(`Orbital geometry did not resolve: ${JSON.stringify(orbital)}`);
+    }
   }
   await page.locator('#twin').getByRole('button', { name: 'Rotate', exact: true }).click();
   if (await page.locator('#twin').getByRole('button', { name: 'Rotate', exact: true }).getAttribute('aria-pressed') !== 'true') throw new Error('Orbit control did not activate.');
@@ -49,9 +59,34 @@ try {
   await page.getByRole('button', { name: 'Select IBG-002' }).click();
   if (!(await page.locator('.command-grid h3').textContent()).includes('IBG-002')) throw new Error('Object inspector did not update.');
   await page.getByRole('button', { name: 'Eastern passage' }).click();
+  await page.waitForTimeout(350);
+  await page.getByLabel('Vessel ice class').selectOption('PC7');
+  await expect(page.getByRole('button', { name: 'Approve demo route' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Western passage' }).click();
+  await page.getByRole('button', { name: 'Approve demo route' }).click();
+  await expect(page.locator('.approval-gate [role="status"]')).toContainText('DEMO APPROVED');
+  await page.getByLabel('Observation age', { exact: true }).focus();
+  await page.keyboard.press('End');
+  await expect(page.getByLabel('Observation age', { exact: true })).toHaveValue('48');
+  await expect(page.locator('.approval-gate [role="status"]')).toContainText('AWAITING');
+  await page.getByLabel('Forecast horizon', { exact: true }).focus();
+  await page.keyboard.press('End');
+  await expect(page.getByLabel('Forecast horizon', { exact: true })).toHaveValue('24');
+  await page.getByRole('button', { name: 'Connected demo' }).click();
+  if (!(await page.getByRole('button', { name: 'Cached-data demo' }).getAttribute('aria-pressed') === 'true')) throw new Error('Cached-data mode failed.');
+  await page.getByRole('button', { name: 'Current-assisted passage' }).click();
+  await page.getByRole('button', { name: 'Why data age matters', exact: true }).click();
+  await page.locator('.command-content').evaluate(element => element.parentElement.scrollTo(0, 0));
+  await page.waitForTimeout(350);
   await page.screenshot({ path: 'artifacts/06-command-center.png' });
   await page.keyboard.press('Escape');
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  await page.getByRole('tab', { name: 'Find the passage' }).scrollIntoViewIfNeeded();
+  await page.waitForTimeout(1400);
+  await page.getByRole('tab', { name: 'Find the passage' }).click();
+  if (!(await page.getByRole('tabpanel').textContent()).includes('A*')) throw new Error('Architecture content did not update.');
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: 'artifacts/06b-blueprint.png' });
   await page.evaluate(() => window.scrollTo(0, document.getElementById('simulation').offsetTop));
   await page.waitForTimeout(1800);
   await page.getByRole('button', { name: 'Storm + iceberg' }).click();
@@ -77,8 +112,17 @@ try {
   await mobile.evaluate(() => window.scrollTo(0, document.getElementById('simulation').offsetTop));
   await mobile.waitForTimeout(500);
   await mobile.screenshot({ path: 'artifacts/10-mobile-simulator.png' });
+  await mobile.locator('.command-button').click();
+  await expect(mobile.getByRole('dialog')).toBeVisible();
+  await mobile.getByRole('button', { name: 'Current-assisted passage' }).click();
+  await expect(mobile.getByRole('button', { name: 'Current-assisted passage' })).toHaveAttribute('aria-pressed', 'true');
+  if (await mobile.getByRole('dialog').evaluate(element => element.scrollWidth > element.clientWidth)) throw new Error('Mobile decision studio has horizontal overflow.');
+  await mobile.locator('.command-content').evaluate(element => element.parentElement.scrollTo(0, 0));
+  await mobile.screenshot({ path: 'artifacts/11-mobile-studio.png' });
+  await mobile.getByRole('button', { name: 'Close command center' }).click();
+  await expect(mobile.getByRole('dialog')).toBeHidden();
   if (errors.length) throw new Error(`Browser errors:\n${errors.join('\n')}`);
-  console.log('PASS: WebGL startup, live ocean-time and sunrise GPU uniforms, 14 chapters, desktop/mobile layout, orbit/layers, command center, object inspection, route comparison, Escape dismissal, scenario completion/reset, and reduced-motion mobile.');
+  console.log('PASS: WebGL, live GPU animation, orbital chapter, 14 chapters, responsive layout, layer controls, three route options, vessel threshold, approval/invalidation, forecast and data age, cached-data demo, architecture tabs, scenario replay, and reduced-motion mobile.');
   console.log('Screenshots written to artifacts/.');
 } catch (error) {
   console.error('Captured browser errors:', errors);

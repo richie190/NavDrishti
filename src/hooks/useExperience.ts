@@ -49,6 +49,12 @@ export function useExperience(ready: boolean) {
     });
     const context = gsap.context(() => {
       sections.slice(1).forEach(section => {
+        if (section.id === 'capabilities') {
+          section.querySelectorAll('[data-reveal]').forEach(element => {
+            gsap.fromTo(element, { y: reduced ? 0 : 35, opacity: 0 }, { y: 0, opacity: 1, duration: reduced ? .01 : 1, ease: 'power3.out', scrollTrigger: { trigger: element, start: 'top 93%', toggleActions: 'play none none reverse' } });
+          });
+          return;
+        }
         gsap.fromTo(section.querySelectorAll('[data-reveal]'), { y: reduced ? 0 : 50, opacity: 0 }, {
           y: 0, opacity: 1, stagger: 0.09, duration: reduced ? 0.01 : 1.05, ease: 'power3.out',
           scrollTrigger: { trigger: section, start: 'top 76%', toggleActions: 'play none none reverse' },

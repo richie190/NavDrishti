@@ -22,18 +22,19 @@ export default function Ocean({ motion, lite }: { motion: RefObject<MotionState>
     const live = material.current.uniforms;
     live.uTime.value = motion.current.reduced ? 0 : clock.elapsedTime;
     live.uEye.value.copy(camera.position);
-    live.uDanger.value = windowAt(motion.current.chapter, 5, 6.5);
+    live.uDanger.value = Math.max(windowAt(motion.current.chapter, 5, 6.5), motion.current.scenario === 'storm' ? windowAt(motion.current.chapter, 11.8, 12.6) : 0);
     live.uDawn.value = smooth(12.2, 13.2, motion.current.chapter);
   });
   return <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.18, 0]}>
     <planeGeometry args={[700, 700, lite ? 100 : 230, lite ? 100 : 230]} />
     <shaderMaterial ref={material} uniforms={uniforms} vertexShader={`
       uniform float uTime;
+      uniform float uDanger;
       varying vec3 vWorld;
       ${waves}
       void main() {
         vec3 p = position;
-        p.z = wave(p.xy, uTime);
+        p.z = wave(p.xy, uTime) * (1. + uDanger * 1.8);
         vWorld = (modelMatrix * vec4(p, 1.)).xyz;
         gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.);
       }
@@ -49,10 +50,10 @@ export default function Ocean({ motion, lite }: { motion: RefObject<MotionState>
         float e = .09;
         float dx = (wave(p + vec2(e,0.),uTime)-wave(p-vec2(e,0.),uTime))/(2.*e);
         float dz = (wave(p + vec2(0.,e),uTime)-wave(p-vec2(0.,e),uTime))/(2.*e);
-        vec3 n = normalize(vec3(-dx, 1., dz));
+        vec3 n = normalize(vec3(-dx*(1.+uDanger), 1., dz*(1.+uDanger)));
         vec3 eye = normalize(uEye - vWorld);
         float fresnel = pow(1. - max(dot(n, eye), 0.), 3.);
-        vec3 deep = mix(vec3(.0, .15, .42), vec3(.0, .09, .26), uDanger * .75);
+        vec3 deep = mix(vec3(.003, .038, .12), vec3(.005, .012, .036), uDanger * .75);
         vec3 horizon = mix(vec3(.0, .278, .671), vec3(.48, .38, .27), uDawn);
         vec3 color = mix(deep, horizon, fresnel * .58);
         vec3 light = normalize(vec3(-.35,.25,-.8));
@@ -61,6 +62,9 @@ export default function Ocean({ motion, lite }: { motion: RefObject<MotionState>
         color += spec * mix(vec3(.15, .45, .95), vec3(1., .68, .35), uDawn) * .6;
         float ripple = pow(abs(sin(p.x * 2.1 + p.y * 1.9 + wave(p,uTime)*5.)), 22.);
         color += vec3(.0, .278, .671) * ripple * .035;
+        float shore=exp(-abs(length((vWorld.xz-vec2(10.,-9.))/vec2(10.7,8.7))-1.)*35.);
+        float foam=shore*(.5+.5*sin(length(vWorld.xz)*8.-uTime*1.5));
+        color=mix(color,vec3(.52,.75,.86),foam*.35);
         float riskLight = exp(-length(vWorld.xz-vec2(0.,-3.))*.05)*uDanger;
         color += vec3(.18,.006,.002)*riskLight;
         float fog = 1. - exp(-length(uEye - vWorld) * .0028);
