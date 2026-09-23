@@ -14,7 +14,6 @@ import {
   Fuel,
   Gauge,
   Info,
-  Play,
   Radar,
   Route as RouteIcon,
   ShieldAlert,
@@ -37,11 +36,12 @@ interface IcebergSighting {
 }
 
 const analysisStages = [
-  'Fetching User & Vessel Mission Profile...',
-  'Ingesting SAR imagery (Copernicus Sentinel-1)',
-  'Retrieving real-time ice data (NSIDC/AMSR2)',
-  'Processing hydrographic & drift telemetry',
-  'Running Polaris risk-optimisation algorithm',
+  'Fetching NSIDC sea-ice datasets...',
+  'Fetching NYU oceanographic datasets...',
+  'Fetching Copernicus current data...',
+  'Fetching ERA5 atmospheric reanalysis...',
+  'Fetching satellite imagery...',
+  'Running Polaris route optimisation...',
 ];
 
 export interface RouteOption {
@@ -387,12 +387,6 @@ export default function CommandCenter({ navigate: propNavigate }: CommandCenterP
     }, 5200);
   };
 
-  const startReplay = () => {
-    if (!activeCase) return;
-    setMode('replay');
-    setProgress(0);
-  };
-
   useEffect(() => () => {
     if (analysisTimer.current) clearTimeout(analysisTimer.current);
   }, []);
@@ -425,6 +419,7 @@ export default function CommandCenter({ navigate: propNavigate }: CommandCenterP
       {/* Top Header Bar */}
       <header className="command-topbar">
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <img className="command-logo" src="/navdhrishti-logo.svg" alt="NAVDHRISHTI logo" />
           <button
             className="command-back"
             onClick={() => navigate('/')}
@@ -618,30 +613,7 @@ export default function CommandCenter({ navigate: propNavigate }: CommandCenterP
                 isAnalysing={isAnalysing}
               />
 
-              <div className="map-overlay-bottom">
-                {isAnalysing ? (
-                  <AnalysisPopup />
-                ) : mode === 'idle' ? (
-                  <button className="start-simulation-button" onClick={startReplay}>
-                    <Play size={15} fill="currentColor" /> SIMULATE PASSAGE ({selectedRoute.label.toUpperCase()})
-                  </button>
-                ) : (
-                  <div className="replay-controls">
-                    <div className="replay-meta mono">
-                      <span>REPLAYING: {selectedRoute.label}</span>
-                      <strong>{Math.round(progress * 100)}% COMPLETE</strong>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={Math.round(progress * 100)}
-                      onChange={e => setProgress(Number(e.target.value) / 100)}
-                      className="replay-range"
-                    />
-                  </div>
-                )}
-              </div>
+              
             </>
           ) : (
             <div
@@ -856,6 +828,7 @@ function MapShell({
         <Marker position={activeCase.routes[0].points[activeCase.routes[0].points.length - 1]} icon={portIcon('DEST')} />
         {!isAnalysing && <Marker position={shipPos} icon={shipIcon()} zIndexOffset={1000} />}
       </MapContainer>
+      {isAnalysing && <AnalysisPopup />}
     </div>
   );
 }

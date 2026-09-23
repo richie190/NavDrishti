@@ -20,6 +20,15 @@
 @media(max-width:760px){.site-header{height:76px;padding:0 6%;gap:10px}.brand{gap:8px}.brand>svg{width:22px}.brand>span{font-size:14px;letter-spacing:.14em}.brand small{font-size:5px}.site-header nav{display:none}.header-actions{gap:14px}.command-button{padding:10px;border-color:#bad4d144}.command-button span{display:none}.film-button{padding:10px 0}.side-coordinate,.frame-corner,.chapter-rail,.hero-object-tag,.hero-watermark,.footer-center{display:none}.experience-footer{left:6%;right:6%;height:53px;font-size:8px}.chapter-index{gap:8px;font-size:9px}.quality-toggle{font-size:7px}.story-section{padding:110px 8% 110px;min-height:110svh}.hero-section{height:100svh;min-height:690px;align-items:flex-start;padding-top:145px;padding-bottom:120px}.hero-copy{width:100%;max-width:none}.hero-eyebrow{font-size:6px;letter-spacing:.1em;margin-bottom:25px}.hero-copy h1{font-size:clamp(98px,23vw,154px)}.hero-copy h2{font-size:19px;margin-top:22px}.hero-description{font-size:11px;margin-top:16px}.hero-caption{font-size:5px;margin-top:25px;gap:13px}.primary-button{font-size:10px;padding:13px 16px;min-width:180px}.hero-location{bottom:86px;right:8%;gap:5px}.hero-location strong{font-size:9px}.hero-location .eyebrow,.hero-location .mono{font-size:6px}.hero-location{display:none}.scene-shade{background:linear-gradient(90deg,#041820b3,transparent),linear-gradient(0deg,#03151edd,transparent 30%,#03151e33 65%,#03151e99)}.app[data-active] .scene-shade{background:linear-gradient(90deg,#041820bf,#04182055),linear-gradient(0deg,#03151ecc,transparent 50%,#03151e33)}.chapter-copy,.chapter-copy.wide,.align-right .chapter-copy{width:100%;max-width:none}.chapter-copy h2,.capability-heading h2{font-size:clamp(42px,10.5vw,68px)}.section-eyebrow{font-size:7px;margin-bottom:22px}.chapter-copy>p:not(.eyebrow):not(.micro):not(.prototype-note):not(.decision-text):not(.final-preface):not(.final-credit){font-size:12px;max-width:320px}.data-pair{gap:35px;margin-top:28px;padding-top:20px}.metric strong{font-size:34px}.metric .eyebrow{font-size:7px}.bottom-annotation{bottom:95px;font-size:6px}.trajectory-legend{gap:20px}.trajectory-legend span,.time-horizons span{font-size:6px}.scan-readout{max-width:280px;padding:20px}.danger-section .risk-number{font-size:160px}.risk-reduction{font-size:85px}.escape-section{padding-top:145px}.escape-section h2{font-size:clamp(50px,12vw,76px)}.escape-section .bottom-annotation{font-size:6px;gap:8px}.twin-controls button{font-size:9px;padding:10px}.capability-section{padding-top:115px}.capability-heading{margin-bottom:35px}.feature-card{padding:17px;min-height:220px}.feature-card h3{font-size:13px}.feature-card>p{font-size:9px}.feature-visual{height:65px}.feature-top .mono{font-size:7px}.command-feature h3{font-size:18px}.command-feature .text-button{font-size:8px;gap:8px;flex-wrap:wrap}.station-weather{gap:14px;font-size:6px}.simulation-heading h2{font-size:85px}.simulation-heading>p:last-child{font-size:11px}.simulator{grid-template-columns:1fr}.simulation-sidebar{border-right:0;border-bottom:1px solid var(--line);padding:22px}.scenario-options{display:grid;grid-template-columns:1fr 1fr;gap:0 18px;margin:15px 0}.scenario-options button{font-size:9px;gap:8px}.scenario-options button svg{width:12px}.scenario-description{min-height:0;font-size:10px;margin-bottom:16px}.simulation-sidebar .prototype-note{margin-top:14px}.simulation-results{padding:17px;gap:8px}.simulation-results .metric strong{font-size:24px}.simulation-results .metric strong small{font-size:9px}.simulation-results .eyebrow{font-size:5px}.map-legend{font-size:5px;gap:9px;left:16px;bottom:0}.final-section h2{font-size:clamp(48px,11vw,80px)}.final-section .final-preface{font-size:18px}.final-credit{font-size:5px}.final-credit span{font-size:5px}.command-dialog{width:calc(100% - 22px);max-height:92svh}.command-content{padding:20px}.command-heading h2{font-size:27px}.command-heading .eyebrow{font-size:6px}.command-stats{grid-template-columns:repeat(2,1fr)}.command-stats>div{padding:15px;border-bottom:1px solid var(--line)}.command-stats strong{font-size:27px}.command-grid{grid-template-columns:1fr}.command-grid>aside{border-left:0;border-top:1px solid var(--line);padding:20px}.render-notice{top:80px;right:4%;left:4%;font-size:7px;flex-wrap:wrap}.station-marker{font-size:6px;padding:7px}.object-label{min-width:85px}.object-label span{font-size:7px}.object-label small{font-size:5px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition-duration:.01ms!important;scroll-behavior:auto!important}.feature-traveler{display:none}.map-route{stroke-dasharray:none}.film-grain{display:none}}
 
+.analysis-popup{position:absolute;inset:0;z-index:1000;display:flex;flex-direction:column;justify-content:center;width:min(430px,calc(100% - 40px));height:max-content;margin:auto;padding:24px 26px;border:1px solid #39d7ff88;background:rgba(0,18,42,.94);box-shadow:0 0 0 1px #002d5d,0 18px 60px #000b,0 0 34px #00b9ff22;backdrop-filter:blur(12px);pointer-events:none}
+.analysis-popup-heading{display:flex;align-items:center;gap:10px;padding-bottom:15px;border-bottom:1px solid #39d7ff44;color:#b9efff;font-family:var(--mono);font-size:10px;letter-spacing:.12em}
+.analysis-popup-heading svg{color:#39d7ff;animation:analysisRadar 1.8s linear infinite}
+.analysis-stage{display:flex;align-items:center;gap:11px;padding-top:13px;color:#c8d9e8;font-family:var(--mono);font-size:9px;letter-spacing:.04em;opacity:.2;animation:analysisStage 5.2s ease-out both;animation-delay:var(--stage-delay)}
+.analysis-spinner{width:8px;height:8px;flex:0 0 8px;border:1px solid #39d7ff66;border-top-color:#39d7ff;border-radius:50%;animation:analysisSpin 1s linear infinite}
+@keyframes analysisStage{0%{opacity:.2}12%,100%{opacity:1}}
+@keyframes analysisSpin{to{transform:rotate(360deg)}}
+@keyframes analysisRadar{to{transform:rotate(360deg)}}
+
 /* =========================================================
    LOGIN PAGE (AUTHENTICATION & EXPEDITION POSTS)
    ========================================================= */
@@ -86,6 +95,38 @@
   width: 32px;
   height: 36px;
   color: #00e5ff;
+  object-fit: contain;
+}
+
+.brand > img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+
+.boot-logo {
+  width: 78px;
+  height: 78px;
+  object-fit: contain;
+}
+
+@media (max-width: 760px) {
+  .brand > img {
+    width: 44px;
+    height: 44px;
+  }
+
+  .command-logo {
+    width: 34px;
+    height: 38px;
+  }
+}
+
+.command-logo {
+  width: 42px;
+  height: 48px;
+  object-fit: contain;
+  flex: 0 0 auto;
 }
 
 .brand-text {

@@ -98,7 +98,7 @@ export default function Login() {
       callsign: callsign.trim() || activeRole.defaultCallsign,
       loginTime: new Date().toISOString(),
     };
-    sessionStorage.setItem('navdrishti_session', JSON.stringify(sessionData));
+    sessionStorage.setItem('navdhrishti_session', JSON.stringify(sessionData));
 
     setTimeout(() => {
       navigate('/command-center');
@@ -119,14 +119,11 @@ export default function Login() {
         <button
           className="brand login-brand"
           onClick={() => navigate('/')}
-          aria-label="NAVDRISHTI, return to start"
+          aria-label="NAVDHRISHTI, return to start"
         >
-          <svg viewBox="0 0 36 40" fill="none" aria-hidden="true" className="brand-logo-svg">
-            <path d="m18 2 15 34-15-8L3 36 18 2Z" stroke="currentColor" strokeWidth="1.6" />
-            <path d="M18 2v26M3 36l15-18 15 18" stroke="currentColor" strokeWidth="1" />
-          </svg>
+          <img src="/navdhrishti-logo.svg" alt="" className="brand-logo-svg" />
           <div className="brand-text">
-            <span>NAVDRISHTI</span>
+            <span>NAVDHRISHTI</span>
             <small>POLAR INTELLIGENCE ENVIRONMENT</small>
           </div>
         </button>
@@ -159,7 +156,7 @@ export default function Login() {
           >
             Choose your
             <br />
-            <span className="gradient-text">station.</span>
+            <span className="gradient-text">role.</span>
           </motion.h1>
 
           <motion.p
@@ -168,7 +165,7 @@ export default function Login() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.2 }}
           >
-            Select an operational role to authenticate your session before entering the NavDrishti polar navigation & iceberg decision dashboard.
+            Select an operational role to authenticate your session before entering the NavDhrishti polar navigation & iceberg decision dashboard.
           </motion.p>
 
           {/* Identification Input */}

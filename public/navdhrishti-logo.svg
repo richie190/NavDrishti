@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">NavDhrishti anchor and snowflake logo</title>
+  <desc id="desc">An anchor overlaid on an Antarctic snowflake with a ship at its base.</desc>
+  <defs>
+    <linearGradient id="ice" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d9f8ff"/><stop offset="1" stop-color="#49bce8"/></linearGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#28476c"/><stop offset=".52" stop-color="#071e42"/><stop offset="1" stop-color="#0b3770"/></linearGradient>
+  </defs>
+  <g fill="none" stroke="url(#ice)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity=".92">
+    <path d="M128 48v116M69 82l118 68M69 150 187 82"/>
+    <path d="m128 66-14-15m14 15 14-15m-14 56-23-23m23 23 23-23m-48 68-22-23m22 23 8-31m48 31 22-23m-22 23-8-31"/>
+    <path d="m87 93-21-1m21 1-10-20m102 20 21-1m-21 1 10-20m-102 55-21 1m21-1-10 20m102-20 21 1m-21-1 10 20"/>
+  </g>
+  <g fill="none" stroke="url(#steel)" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="128" cy="40" r="23" stroke-width="9"/>
+    <path d="M128 63v107M94 78h68M128 78l-28 31m28-31 28 31" stroke-width="10"/>
+    <path d="M76 130c-1 42 21 69 52 69s53-27 52-69M76 130l-17 20m17-20 18 16m86-16 17 20m-17-20-18 16" stroke-width="9"/>
+  </g>
+  <g fill="url(#steel)" stroke="#0a2b56" stroke-width="3">
+    <path d="M128 153 103 184h50z"/><path d="M128 153v47l-31-16 13-9zM128 153v47l31-16-13-9z"/><path d="M107 181h42l-8 12h-26z"/>
+  </g>
+  <path d="M91 207c24 13 50 18 74 0-18 24-56 24-74 0Z" fill="#19a9e0"/>
+</svg>
